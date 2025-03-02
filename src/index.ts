@@ -2,6 +2,7 @@ import FabricCAServices from 'fabric-ca-client';
 import { IEnrollmentRequest, IRegisterRequest } from 'fabric-ca-client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { ICryptoSuite, ICryptoKey, User } from 'fabric-common';
 import { IdentityManager } from './IdentityManager';
 
@@ -19,7 +20,7 @@ async function main() {
         const adminIdentity = await identityManager.enrollAdmin();
 
         // Register and enroll a new user
-        const userId = crypto.randomUUID();
+        const userId = crypto.randomBytes(10).toString('hex');
         const userAffiliation = 'org1.department1';
         const userRole = 'voter';
 

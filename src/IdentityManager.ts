@@ -1,23 +1,32 @@
 import FabricCAServices from 'fabric-ca-client';
 import { IEnrollmentRequest, IRegisterRequest } from 'fabric-ca-client';
 import * as fs from 'fs/promises';
-import fsSync from 'fs';
 import * as path from 'path';
 import { User, Utils } from 'fabric-common';
+
+class IdentityManagerError extends Error {
+    constructor(message: string, public readonly cause?: Error) {
+        super(message);
+        this.name = 'IdentityManagerError';
+    }
+}
 
 export class IdentityManager {
     private ca: FabricCAServices;
     private walletPath: string;
 
     constructor(caUrl: string, tlsCert?: string) {
-        const options: any = {
-            verify: false
-        };
+        try {
+            const options: any = {
+                verify: false,
+                trustedRoots: tlsCert ? [tlsCert] : undefined
+            };
 
-        options.trustedRoots = [tlsCert];
-
-        this.ca = new FabricCAServices(caUrl, options);
-        this.walletPath = path.join(__dirname, '..', 'wallet');
+            this.ca = new FabricCAServices(caUrl, options);
+            this.walletPath = path.join(__dirname, '..', 'wallet');
+        } catch (error) {
+            throw new IdentityManagerError('Failed to initialize IdentityManager', error as Error);
+        }
     }
 
     async enrollAdmin(): Promise<User> {
@@ -25,38 +34,66 @@ export class IdentityManager {
         const adminKeyPath = path.join(this.walletPath, 'admin', 'key.pem');
 
         try {
-            // Check if admin credentials already exist
-            const certExists = await fs.access(adminCertPath)
-                .then(() => true)
-                .catch(() => false);
-            const keyExists = await fs.access(adminKeyPath)
-                .then(() => true)
-                .catch(() => false);
+            // Verify wallet directory exists
+            await fs.mkdir(this.walletPath, { recursive: true });
 
-            if (certExists && keyExists) {
-                console.log('Loading existing admin credentials');
-                const certificate = await fs.readFile(adminCertPath, 'utf8');
-                const privateKeyPEM = await fs.readFile(adminKeyPath, 'utf8');
-                
-                const adminIdentity = new User('admin');
-                
-                
-                const cryptoSuite = Utils.newCryptoSuite();
-                const cryptoStore = Utils.newCryptoKeyStore();
-                cryptoSuite.setCryptoKeyStore(cryptoStore);
-                
-                const key = await cryptoSuite.importKey(privateKeyPEM, { ephemeral: true });
-                
-                await adminIdentity.setEnrollment(
-                    key,
-                    certificate,
-                    'Org1MSP'
-                );
-                
-                return adminIdentity;
+            const [certExists, keyExists] = await Promise.all([
+                fs.access(adminCertPath).then(() => true).catch(() => false),
+                fs.access(adminKeyPath).then(() => true).catch(() => false)
+            ]);
+
+            if (certExists !== keyExists) {
+                throw new IdentityManagerError('Admin credentials are in an inconsistent state');
             }
 
-            // If credentials don't exist, enroll admin
+            if (certExists && keyExists) {
+                return await this.loadExistingAdmin(adminCertPath, adminKeyPath);
+            }
+
+            return await this.enrollNewAdmin();
+        } catch (error) {
+            if (error instanceof IdentityManagerError) {
+                throw error;
+            }
+            throw new IdentityManagerError('Failed to enroll admin', error as Error);
+        }
+    }
+
+    private async loadExistingAdmin(certPath: string, keyPath: string): Promise<User> {
+        try {
+            console.log('Loading existing admin credentials');
+            const [certificate, privateKeyPEM] = await Promise.all([
+                fs.readFile(certPath, 'utf8'),
+                fs.readFile(keyPath, 'utf8')
+            ]);
+
+            const adminIdentity = new User('admin');
+            const cryptoSuite = Utils.newCryptoSuite();
+            const cryptoStore = Utils.newCryptoKeyStore();
+            
+            if (!cryptoStore) {
+                throw new IdentityManagerError('Failed to create crypto store');
+            }
+
+            cryptoSuite.setCryptoKeyStore(cryptoStore);
+
+            try {
+                const key = await cryptoSuite.importKey(privateKeyPEM, { ephemeral: true });
+                await adminIdentity.setEnrollment(key, certificate, 'Org1MSP');
+                return adminIdentity;
+            } catch (error) {
+                throw new IdentityManagerError('Failed to import admin key', error as Error);
+            }
+        } catch (error) {
+            if (error instanceof IdentityManagerError) {
+                throw error;
+            }
+            throw new IdentityManagerError('Failed to load existing admin', error as Error);
+        }
+    }
+
+    private async enrollNewAdmin(): Promise<User> {
+        try {
             console.log('Enrolling admin for the first time');
             const enrollment = await this.ca.enroll({
                 enrollmentID: 'admin',
@@ -74,8 +111,7 @@ export class IdentityManager {
 
             return adminIdentity;
         } catch (error) {
-            console.error('Failed to get admin identity:', error);
-            throw error;
+            throw new IdentityManagerError('Failed to enroll new admin', error as Error);
         }
     }
 
@@ -85,22 +121,33 @@ export class IdentityManager {
         userAffiliation: string,
         userRole: string
     ): Promise<string> {
-        const registerRequest: IRegisterRequest = {
-            enrollmentID: userId,
-            enrollmentSecret: '',
-            role: 'client',
-            affiliation: userAffiliation,
-            maxEnrollments: -1,
-            attrs: [{
-                name: 'role',
-                value: userRole,
-                ecert: true
-            }]
-        };
+        try {
+            if (!adminIdentity) {
+                throw new IdentityManagerError('Admin identity is required');
+            }
 
-        const secret = await this.ca.register(registerRequest, adminIdentity);
-        console.log(`Successfully registered user ${userId}`);
-        return secret;
+            const registerRequest: IRegisterRequest = {
+                enrollmentID: userId,
+                enrollmentSecret: '',
+                role: 'client',
+                affiliation: userAffiliation,
+                maxEnrollments: -1,
+                attrs: [{
+                    name: 'role',
+                    value: userRole,
+                    ecert: true
+                }]
+            };
+
+            const secret = await this.ca.register(registerRequest, adminIdentity);
+            console.log(`Successfully registered user ${userId}`);
+            return secret;
+        } catch (error) {
+            throw new IdentityManagerError(
+                `Failed to register user ${userId}`,
+                error as Error
+            );
+        }
     }
 
     async enrollUser(userId: string, userSecret: string): Promise<User> {
@@ -111,7 +158,6 @@ export class IdentityManager {
 
         const enrollment = await this.ca.enroll(enrollmentRequest);
         await this.saveCertificates(userId, enrollment);
-
 
         const userIdentity = new User(userId);
         await userIdentity.setEnrollment(
@@ -128,16 +174,33 @@ export class IdentityManager {
         userId: string,
         enrollment: FabricCAServices.IEnrollResponse
     ): Promise<void> {
-        const certsDir = path.join(this.walletPath, userId);
-        await fs.mkdir(certsDir, { recursive: true });
+        try {
+            if (!enrollment?.certificate || !enrollment?.key) {
+                throw new IdentityManagerError('Invalid enrollment response');
+            }
 
-        await fs.writeFile(
-            path.join(certsDir, `cert.pem`),
-            enrollment.certificate
-        );
-        await fs.writeFile(
-            path.join(certsDir, `key.pem`),
-            enrollment.key.toBytes()
-        );
+            const certsDir = path.join(
+                this.walletPath,
+                userId === 'admin' ? 'admin' : `users/${userId}`
+            );
+
+            await fs.mkdir(certsDir, { recursive: true });
+
+            await Promise.all([
+                fs.writeFile(
+                    path.join(certsDir, 'cert.pem'),
+                    enrollment.certificate
+                ),
+                fs.writeFile(
+                    path.join(certsDir, 'key.pem'),
+                    enrollment.key.toBytes()
+                )
+            ]);
+        } catch (error) {
+            throw new IdentityManagerError(
+                `Failed to save certificates for ${userId}`,
+                error as Error
+            );
+        }
     }
 }

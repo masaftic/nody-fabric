@@ -12,12 +12,12 @@ import (
 )
 
 func main() {
-	assetChaincode, err := contractapi.NewChaincode(&chaincode.SmartContract{})
+	assetChaincode, err := contractapi.NewChaincode(&chaincode.VotingContract{})
 	if err != nil {
-		log.Panicf("Error creating asset-transfer-basic chaincode: %v", err)
+		log.Panicf("Error creating voting chaincode: %v", err)
 	}
 
 	if err := assetChaincode.Start(); err != nil {
-		log.Panicf("Error starting asset-transfer-basic chaincode: %v", err)
+		log.Panicf("Error starting voting chaincode: %v", err)
 	}
 }

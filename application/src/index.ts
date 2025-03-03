@@ -42,6 +42,9 @@ async function fabricConnection(): Promise<[Gateway, grpc.Client]> {
     const gateway = connect({
         client,
         identity: await userIdentity(),
+
+        // TODO: Off-line signing 
+        // https://hyperledger.github.io/fabric-gateway/main/api/node/interfaces/Contract.html#off-line-signing     
         signer: await newSigner(),
         hash: hash.sha256,
 
@@ -71,29 +74,6 @@ async function newGrpcConnection(): Promise<grpc.Client> {
     });
 }
 
-
-async function initLedger(contract: Contract): Promise<void> {
-    console.log('\n--> Submit Transaction: InitLedger, function creates the initial set of assets on the ledger');
-
-    await contract.submitTransaction('InitLedger');
-
-    console.log('*** Transaction committed successfully');
-}
-
-/**
- * Evaluate a transaction to query ledger state.
- */
-async function getAllAssets(contract: Contract): Promise<void> {
-    console.log('\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger');
-
-    const resultBytes = await contract.evaluateTransaction('GetAllAssets');
-
-    const resultJson = utf8Decoder.decode(resultBytes);
-    const result: unknown = JSON.parse(resultJson);
-    console.log('*** Result:', result);
-}
-
-
 async function RegisterAndEnrollUser() {
     const tlsCert = await fs.readFile(fabricCaTlsCertPath);
 
@@ -122,6 +102,41 @@ async function RegisterAndEnrollUser() {
     console.log('Successfully registered and enrolled user:', userEnrollment);
 }
 
+async function initLedger(contract: Contract) {
+    console.log(`\n--> InitLedger initializes the ledger with some sample elections`);
+
+    await contract.submitTransaction('InitLedger');
+
+    console.log('*** Transaction committed successfully');
+}
+
+async function castVote(contract: Contract, voteId: string, voterId: string, electionId: string, candidateId: string): Promise<void> {
+    console.log(`\n--> Submit Transaction: CastVote, function casts a vote for election ${electionId}`);
+
+    await contract.submitTransaction('CastVote', voteId, voterId, electionId, candidateId);
+
+    console.log('*** Transaction committed successfully');
+}
+
+async function getVote(contract: Contract, voteId: string): Promise<void> {
+    console.log(`\n--> Evaluate Transaction: GetVote, function returns the vote with ID ${voteId}`);
+
+    const resultBytes = await contract.evaluateTransaction('GetVote', voteId);
+
+    const resultJson = utf8Decoder.decode(resultBytes);
+    const result: unknown = JSON.parse(resultJson);
+    console.log('*** Result:', result);
+}
+
+async function getElection(contract: Contract, electionID: string): Promise<void> {
+    console.log(`\n--> Evaluate Transaction: GetElection, function returns the election with ID ${electionID}`);
+
+    const resultBytes = await contract.evaluateTransaction('GetElection', electionID);
+
+    const resultJson = utf8Decoder.decode(resultBytes);
+    const result: unknown = JSON.parse(resultJson);
+    console.log('*** Result:', result);
+}
 
 async function main() {
     await RegisterAndEnrollUser();
@@ -136,13 +151,19 @@ async function main() {
         const contract = network.getContract(chaincodeName);
 
         await initLedger(contract);
-        await getAllAssets(contract);
+
+        // Cast a vote
+        await castVote(contract, 'vote123', 'uuid-xyz', 'election123', 'candidateA');
+
+        // Get the vote
+        await getVote(contract, 'vote123');
+
+        await getElection(contract, 'election123');
     }
-    catch (error) {
+    finally {
         gateway.close();
         client.close();
     }
 }
-
 
 main().catch(console.error);

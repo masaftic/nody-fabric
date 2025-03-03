@@ -1,0 +1,19 @@
+{
+  "name": "npm-one",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.6",
+    "@hyperledger/fabric-gateway": "^1.7.1",
+    "fabric-ca-client": "^2.2.20"
+  }
+}

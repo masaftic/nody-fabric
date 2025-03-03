@@ -3,7 +3,7 @@
 	"tasks": [
 		{
 			"type": "typescript",
-			"tsconfig": "identity-manager/tsconfig.json",
+			"tsconfig": "application/tsconfig.json",
 			"option": "watch",
 			"problemMatcher": [
 				"$tsc-watch"
@@ -12,7 +12,7 @@
 				"kind": "build",
 				"isDefault": true
 			},
-			"label": "tsc: watch - identity-manager/tsconfig.json"
+			"label": "tsc: watch - application/tsconfig.json"
 		}
 	]
 }

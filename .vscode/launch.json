@@ -11,7 +11,7 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/identity-manager/dist/index.js",
+            "program": "${workspaceFolder}/application/dist/index.js",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
             ]

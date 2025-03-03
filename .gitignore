@@ -1,0 +1,7 @@
+node_modules/
+dist/
+vendor/
+application/wallet
+/bin/
+builders/
+hyperledger-fabric/bin

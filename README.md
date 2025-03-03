@@ -13,7 +13,7 @@ Connect to a hyperledger fabric network with gateway, registers and enrolls new 
 
 ### Setup the network & Deploy the chaincode
 
-fabric binaries must be in hyperledger-fabric/bin/
+> ⚠️ **IMPORTANT**: fabric binaries must be in `hyperledger-fabric/bin/`
 
 ```bash
 $ cd hyperledger-fabric/network

@@ -1,6 +1,6 @@
-# Using Fabric-ca-client in nodejs
+# Hyperledger Fabric Project
 
-simple example that registers and enrolls new identities in a hyperledger fabric network using an admin identity.
+Connect to a hyperledger fabric network with gateway, registers and enrolls new identities, invoke chaincode.
 
 ## Requirements
 1. docker & docker compose

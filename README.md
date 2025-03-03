@@ -3,7 +3,7 @@
 simple example that registers and enrolls new identities in a hyperledger fabric network using an admin identity.
 
 ## Requirements
-1. docker
+1. docker & docker compose
 2. fabric images & binaries
 3. nodejs
 4. tsc

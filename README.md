@@ -24,7 +24,7 @@ $ ./network.sh down
 # run the network with fabric-ca
 $ ./network.sh up createChannel -ca
 
-# deploy the chaindcode
+# deploy the chaincode
 $ ./network.sh deployCC -ccn basic -ccp ../../chaincode-go -ccl go
 ```
 

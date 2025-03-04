@@ -4,10 +4,12 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { ICryptoSuite, ICryptoKey, User } from 'fabric-common';
-import { IdentityManager } from './IdentityManager';
+import { IdentityManager } from './identityManager';
 import * as grpc from '@grpc/grpc-js';
-import { connect, Contract, Gateway, hash, Identity, Signer, signers } from '@hyperledger/fabric-gateway';
+import { connect, Gateway, hash, Identity, Signer, signers } from '@hyperledger/fabric-gateway';
 import { mspId, channelName, chaincodeName, tlsCertPath, peerEndpoint, fabricCaTlsCertPath, caURL, peerHostAlias, usersWalletPath } from './config';
+import { VotingContractController } from './votingContractController';
+import { timeOperation } from './utils';
 
 const utf8Decoder = new TextDecoder();
 
@@ -74,7 +76,7 @@ async function newGrpcConnection(): Promise<grpc.Client> {
     });
 }
 
-async function RegisterAndEnrollUser() {
+async function registerAndEnrollUser() {
     const tlsCert = await fs.readFile(fabricCaTlsCertPath);
 
     const identityManager = new IdentityManager(caURL, fabricCaTlsCertPath);
@@ -99,68 +101,56 @@ async function RegisterAndEnrollUser() {
     const userEnrollment = await identityManager.enrollUser(userId, secret);
     // Get certificate and private key
 
-    console.log('Successfully registered and enrolled user:', userEnrollment);
-}
-
-async function initLedger(contract: Contract) {
-    console.log(`\n--> InitLedger initializes the ledger with some sample elections`);
-
-    await contract.submitTransaction('InitLedger');
-
-    console.log('*** Transaction committed successfully');
-}
-
-async function castVote(contract: Contract, voteId: string, voterId: string, electionId: string, candidateId: string): Promise<void> {
-    console.log(`\n--> Submit Transaction: CastVote, function casts a vote for election ${electionId}`);
-
-    await contract.submitTransaction('CastVote', voteId, voterId, electionId, candidateId);
-
-    console.log('*** Transaction committed successfully');
-}
-
-async function getVote(contract: Contract, voteId: string): Promise<void> {
-    console.log(`\n--> Evaluate Transaction: GetVote, function returns the vote with ID ${voteId}`);
-
-    const resultBytes = await contract.evaluateTransaction('GetVote', voteId);
-
-    const resultJson = utf8Decoder.decode(resultBytes);
-    const result: unknown = JSON.parse(resultJson);
-    console.log('*** Result:', result);
-}
-
-async function getElection(contract: Contract, electionID: string): Promise<void> {
-    console.log(`\n--> Evaluate Transaction: GetElection, function returns the election with ID ${electionID}`);
-
-    const resultBytes = await contract.evaluateTransaction('GetElection', electionID);
-
-    const resultJson = utf8Decoder.decode(resultBytes);
-    const result: unknown = JSON.parse(resultJson);
-    console.log('*** Result:', result);
+    console.log('Successfully registered and enrolled user:', userId);
 }
 
 async function main() {
-    await RegisterAndEnrollUser();
-
+    await registerAndEnrollUser();
     const [gateway, client] = await fabricConnection();
 
     try {
-        // Get a network instance representing the channel where the smart contract is deployed.
         const network = gateway.getNetwork(channelName);
-
-        // Get the smart contract from the network.
         const contract = network.getContract(chaincodeName);
+        const votingController = new VotingContractController(contract);
 
-        await initLedger(contract);
+        await timeOperation('Clear State', async () => {
+            await votingController.clearVotes();
+            await votingController.clearElections();
+        });
 
-        // Cast a vote
-        await castVote(contract, 'vote123', 'uuid-xyz', 'election123', 'candidateA');
+        await timeOperation('Init Ledger', async () => {
+            await votingController.initLedger();
+        });
 
-        // Get the vote
-        await getVote(contract, 'vote123');
+        console.log('World State: After Init');
+        await votingController.getWorldState();
 
-        await getElection(contract, 'election123');
-    }
-    finally {
+        
+        const candidates = ['candidateA', 'candidateB'];
+        const getRandomCandidate = () => candidates[Math.floor(Math.random() * candidates.length)];
+        
+        await timeOperation('Cast Votes', async () => {
+            // Parallel vote submission
+            const votePromises = Array(1000).fill(0).map((_, i) =>
+                votingController.castVote(
+                    `${crypto.randomBytes(5).toString('hex')}-${i}`,
+                    'uuid-xyz',
+                    'election123',
+                    getRandomCandidate()
+                )
+            );
+            await Promise.all(votePromises);
+        });
+
+        // console.log('World State: After votes');
+        // await votingController.getWorldState();
+
+        await timeOperation('Compute Tally', async () => {
+            await votingController.computeVoteTally('election123');
+        });
+
+        await votingController.getElection('election123');
+    } finally {
         gateway.close();
         client.close();
     }

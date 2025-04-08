@@ -41,7 +41,7 @@ export const createServerApp = async () => {
     // })
 
     app.use("/api/user",userRouter)
-
+    // /api/user/send-sms
     // app.post('/api/votes', async (req: Request, res: Response) => {
     //     const { userId, electionId, candidateId } = req.body;
     //     if (!userId || !electionId || !candidateId) {

@@ -47,7 +47,7 @@ export class IdentityManager {
             }
 
             if (certExists && keyExists) {
-                return await this.loadExistingAdmin(adminCertPath, adminKeyPath);
+                return await this.loadExistingAdmin();
             }
 
             return await this.enrollNewAdmin();
@@ -59,8 +59,11 @@ export class IdentityManager {
         }
     }
 
-    private async loadExistingAdmin(certPath: string, keyPath: string): Promise<User> {
+    async loadExistingAdmin(): Promise<User> {
         try {
+            const certPath = path.join(this.walletPath, 'admin', 'cert.pem');
+            const keyPath = path.join(this.walletPath, 'admin', 'key.pem');
+
             console.log('Loading existing admin credentials');
             const [certificate, privateKeyPEM] = await Promise.all([
                 fs.readFile(certPath, 'utf8'),
@@ -70,7 +73,7 @@ export class IdentityManager {
             const adminIdentity = new User('admin');
             const cryptoSuite = Utils.newCryptoSuite();
             const cryptoStore = Utils.newCryptoKeyStore();
-            
+
             if (!cryptoStore) {
                 throw new IdentityManagerError('Failed to create crypto store');
             }
@@ -132,11 +135,10 @@ export class IdentityManager {
                 role: 'client',
                 affiliation: userAffiliation,
                 maxEnrollments: -1,
-                attrs: [{
-                    name: 'role',
-                    value: userRole,
-                    ecert: true
-                }]
+                attrs: [
+                    { name: 'role', value: userRole, ecert: true },
+                    { name: 'hf.Registrar.Roles', value: 'client', ecert: true }
+                ]
             };
 
             const secret = await this.ca.register(registerRequest, adminIdentity);
@@ -153,7 +155,8 @@ export class IdentityManager {
     async enrollUser(userId: string, userSecret: string): Promise<IEnrollResponse> {
         const enrollmentRequest: IEnrollmentRequest = {
             enrollmentID: userId,
-            enrollmentSecret: userSecret
+            enrollmentSecret: userSecret,
+            subject: `CN=${userId},OU=client`,
         };
 
         const enrollment = await this.ca.enroll(enrollmentRequest);
@@ -161,6 +164,38 @@ export class IdentityManager {
 
         console.log(`Successfully enrolled user ${userId}`);
         return enrollment;
+    }
+
+    async getUserIdentity(userId: string): Promise<User> {
+        const [certificate, privateKeyPEM] = await this.loadUserCredentials(userId);
+
+        const userIdentity = new User(userId);
+        const cryptoSuite = Utils.newCryptoSuite();
+        const cryptoStore = Utils.newCryptoKeyStore();
+        cryptoSuite.setCryptoKeyStore(cryptoStore);
+        const key = await cryptoSuite.importKey(privateKeyPEM, { ephemeral: true });
+        await userIdentity.setEnrollment(key, certificate, 'Org1MSP');
+        return userIdentity;
+    }
+
+    async loadUserCredentials(userId: string): Promise<[string, string]> {
+        const certPath = path.join(`${this.walletPath}`, 'users', userId, 'cert.pem');
+        const keyPath = path.join(`${this.walletPath}`, 'users', userId, 'key.pem');
+
+        return await Promise.all([
+            fs.readFile(certPath, 'utf8'),
+            fs.readFile(keyPath, 'utf8')
+        ]);
+    }
+
+    async loadAdminCredentials(): Promise<[string, string]> {
+        const certPath = path.join(this.walletPath, 'admin', 'cert.pem');
+        const keyPath = path.join(this.walletPath, 'admin', 'key.pem');
+
+        return await Promise.all([
+            fs.readFile(certPath, 'utf8'),
+            fs.readFile(keyPath, 'utf8')
+        ]);
     }
 
     private async saveCertificates(

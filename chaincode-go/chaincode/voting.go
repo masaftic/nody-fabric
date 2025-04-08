@@ -105,7 +105,7 @@ func (s *VotingContract) InitLedger(ctx contractapi.TransactionContextInterface)
 }
 
 // CastVote allows a voter to cast a vote
-func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, voteID string, voterID string, electionID string, candidateID string) error {
+func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, voteID string, electionID string, candidateID string) error {
 	// Check if the election is active
 	electionJSON, err := ctx.GetStub().GetState(electionPrefix + electionID)
 	if err != nil {
@@ -125,13 +125,18 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 		return fmt.Errorf("the election %s is not active", electionID)
 	}
 
+	voterId, err := ctx.GetClientIdentity().GetID()
+	if err != nil {
+		return fmt.Errorf("failed to get voter ID: %v", err)
+	}
+
 	// Create the vote receipt
 	receipt := sha256.Sum256([]byte(voteID + electionID + candidateID))
 	receiptHex := hex.EncodeToString(receipt[:])
 
 	vote := Vote{
 		VoteID:      voteID,
-		VoterID:     voterID,
+		VoterID:     voterId,
 		ElectionID:  electionID,
 		CandidateID: candidateID,
 		Receipt:     receiptHex,

@@ -5,4 +5,4 @@ application/wallet
 /bin/
 builders/
 hyperledger-fabric/bin
-application/.env
+**/.env

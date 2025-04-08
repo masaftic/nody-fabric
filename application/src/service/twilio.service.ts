@@ -11,12 +11,12 @@ class TwilioService {
     constructor() {
         // Initialize Twilio client
         this.client = twilio(
-            process.env.TWILIO_ACCOUNT_SID || "AC09e60bb1cf519361f991ee872baa75a1",
-            process.env.TWILIO_AUTH_TOKEN || "aa1112257e70457bee97a87a644dc2cf"
+            process.env.TWILIO_ACCOUNT_SID,
+            process.env.TWILIO_AUTH_TOKEN,
         );
 
         // Verify service SID (for phone verification)
-        this.verifyService = process.env.TWILIO_VERIFY_SERVICE_SID || 'VA9b1f1f384f57b369b5d6a8a41b2b3780';
+        this.verifyService = process.env.TWILIO_VERIFY_SERVICE_SID || "";
     }
 
     /**

@@ -36,6 +36,9 @@ $ cd application
 # remove old credentials if there are any from previous runs
 $ rm -rf wallet/
 
+# install dependencies
+$ npm install
+
 # build the project
 $ tsc
 

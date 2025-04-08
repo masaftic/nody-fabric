@@ -4,7 +4,7 @@ export const mspId = 'Org1MSP';
 export const channelName = 'mychannel';
 export const chaincodeName = 'basic';
 
-const cryptoPath = path.resolve(__dirname, '..', '..', 'hyperledger-fabric', 'network', 'organizations', 'peerOrganizations', 'org1.example.com');
+const cryptoPath = path.join(__dirname, '..', '..', '..', 'hyperledger-fabric', 'network', 'organizations', 'peerOrganizations', 'org1.example.com');
 export const tlsCertPath = path.resolve(cryptoPath, 'peers', 'peer0.org1.example.com', 'tls', 'ca.crt');
 export const peerEndpoint = 'localhost:7051';
 

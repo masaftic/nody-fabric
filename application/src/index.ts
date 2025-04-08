@@ -1,5 +1,6 @@
 import { createServerApp } from './server';
-
+require("dotenv").config()
+require("express-async-errors");
 async function main() {
     const app = await createServerApp();
 

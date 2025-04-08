@@ -11,12 +11,6 @@ function build() {
 
     # Deploy the chaincode
     ./network.sh deployCC -ccn basic -ccp ../../chaincode-go -ccl go
-
-    # Navigate to the application directory
-    cd ../../application
-
-    # Build the project
-    tsc
 }
 
 function clean() {
@@ -40,18 +34,6 @@ function deploy() {
 
     # Deploy the chaincode
     ./network.sh deployCC -ccn basic -ccp ../../chaincode-go -ccl go
-
-    # Navigate to the application directory
-    cd ../../application
-
-    # Remove old credentials if there are any from previous runs
-    rm -rf wallet/
-
-    # Build the project
-    tsc
-
-    # Start the application
-    npm start
 }
 
 function upgrade() {

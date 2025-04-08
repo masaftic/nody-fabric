@@ -3,6 +3,7 @@
 Connect to a hyperledger fabric network with gateway, registers and enrolls new identities, invoke chaincode.
 
 ## Requirements
+
 1. docker & docker compose
 2. fabric images & binaries
 3. nodejs
@@ -15,17 +16,25 @@ Connect to a hyperledger fabric network with gateway, registers and enrolls new 
 
 > ⚠️ **IMPORTANT**: fabric binaries must be in `hyperledger-fabric/bin/`
 
+First, ensure the script is executable:
+
 ```bash
-$ cd hyperledger-fabric/network
+$ chmod +x manage.sh
+```
 
-# remove any containers or artifacts from any previous runs 
-$ ./network.sh down
+To set up the network and deploy the chaincode:
+```bash
+# Build and start the network
+$ ./manage.sh build
 
-# run the network with fabric-ca
-$ ./network.sh up createChannel -ca
+# If you need to clean up previous runs
+$ ./manage.sh clean
 
-# deploy the chaincode
-$ ./network.sh deployCC -ccn basic -ccp ../../chaincode-go -ccl go
+# To redeploy the chaincode and run the application
+$ ./manage.sh deploy
+
+# To upgrade the chaincode
+$ ./manage.sh upgrade
 ```
 
 ### Run the gateway application to interact with the fabric network

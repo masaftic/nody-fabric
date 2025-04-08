@@ -6,11 +6,8 @@ function build() {
     # Navigate to the hyperledger-fabric network directory
     cd hyperledger-fabric/network
 
-    # Bring down any existing network
-    ./network.sh down
-
     # Bring up the network with fabric-ca and create a channel
-    ./network.sh up createChannel -ca
+    ./network.sh up createChannel -ca -s couchdb
 
     # Deploy the chaincode
     ./network.sh deployCC -ccn basic -ccp ../../chaincode-go -ccl go
@@ -18,14 +15,8 @@ function build() {
     # Navigate to the application directory
     cd ../../application
 
-    # Remove old credentials if there are any from previous runs
-    rm -rf wallet/
-
     # Build the project
     tsc
-
-    # Start the application
-    npm start
 }
 
 function clean() {
@@ -43,11 +34,43 @@ function clean() {
     rm -rf dist/
 }
 
+function deploy() {
+    # Navigate to the hyperledger-fabric network directory
+    cd hyperledger-fabric/network
+
+    # Deploy the chaincode
+    ./network.sh deployCC -ccn basic -ccp ../../chaincode-go -ccl go
+
+    # Navigate to the application directory
+    cd ../../application
+
+    # Remove old credentials if there are any from previous runs
+    rm -rf wallet/
+
+    # Build the project
+    tsc
+
+    # Start the application
+    npm start
+}
+
+function upgrade() {
+    # Navigate to the hyperledger-fabric network directory
+    cd hyperledger-fabric/network
+
+    # Upgrade the chaincode
+    ./network.sh deployCC -ccn basic -ccp ../../chaincode-go -ccl go -ccv 2.0
+}
+
 if [ "$1" == "build" ]; then
     build
 elif [ "$1" == "clean" ]; then
     clean
+elif [ "$1" == "deploy" ]; then
+    deploy
+elif [ "$1" == "upgrade" ]; then
+    upgrade
 else
-    echo "Usage: $0 {build|clean}"
+    echo "Usage: $0 {build|clean|deploy|upgrade}"
     exit 1
 fi

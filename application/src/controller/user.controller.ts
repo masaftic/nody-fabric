@@ -19,5 +19,9 @@ const register =  async (req: Request, res: Response) => {
     });
 }
 
+const send = async (req : Request, res:Response) => {
+
+}
+
 
 export {register as userRegister}

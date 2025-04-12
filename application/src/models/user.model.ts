@@ -32,10 +32,12 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
     isVerified:{
         type:Boolean,
         default:false,
+        select:false,
     },
     verifyCode:{
         type:String,
         trim: true,
+        select:false
     }
 },
     {timestamps:true}

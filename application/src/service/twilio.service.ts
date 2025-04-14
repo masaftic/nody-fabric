@@ -2,7 +2,7 @@
 
 import { Twilio } from 'twilio';
 import dotenv from 'dotenv';
-import { v4 as uuidv4 } from 'uuid';
+import User from "../models/user.model";
 
 // Load environment variables
 dotenv.config();
@@ -17,19 +17,18 @@ interface OtpRecord {
 
 class TwilioOtpService {
     private twilioClient: Twilio;
-    private otpStore: Record<string, OtpRecord>;
     private twilioPhoneNumber: string;
 
     constructor() {
         const accountSid = process.env.TWILIO_ACCOUNT_SID as string;
         const authToken = process.env.TWILIO_AUTH_TOKEN as string;
-        this.twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER as string
+        this.twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER as string;
+
+        if (!accountSid || !authToken || !this.twilioPhoneNumber) {
+            console.error('Twilio configuration is incomplete');
+        }
 
         this.twilioClient = new Twilio(accountSid, authToken);
-        this.otpStore = {};
-
-        // Start cleanup interval
-        this.startCleanupInterval();
     }
 
     /**
@@ -62,23 +61,29 @@ class TwilioOtpService {
     /**
      * Create and send a new OTP
      */
-    async createAndSendOTP(phoneNumber: string): Promise<{ success: boolean; sessionId?: string; expiresAt?: Date; message: string }> {
+    async createAndSendOTP(phoneNumber: string): Promise<{ success: boolean; expiresAt?: Date; message: string  }> {
+
+        // get user with
+        const user  = await User.findOne({phone:phoneNumber}).select("+phone +isVerified +verifyCode +verifyCodeExpireOn")
+
+        if(!user){
+            return {
+                success:false,
+                message:"User Not Found With This Phone Number"
+            }
+        }
+
         // Generate OTP
-
-        console.log(`here ${process.env.TWILIO_ACCOUNT_SID} -> ${process.env.TWILIO_AUTH_TOKEN} -> ${process.env.TWILIO_PHONE_NUMBER}`)
         const otp = this.generateOTP();
-        const sessionId = uuidv4();
 
-        // Store OTP with expiration (10 minutes)
+        // Store OTP with expiration (30 minutes)
         const expiresAt = new Date();
-        expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+        expiresAt.setMinutes(expiresAt.getMinutes() + 30);
 
-        this.otpStore[sessionId] = {
-            phoneNumber,
-            otp,
-            expiresAt,
-            verified: false
-        };
+        user.verifyCode = otp;
+        user.verifyCodeExpireOn = expiresAt;
+
+        await user.save();
 
         // Send OTP via SMS
         const smsSent = await this.sendSMS(phoneNumber, otp);
@@ -86,12 +91,10 @@ class TwilioOtpService {
         if (smsSent) {
             return {
                 success: true,
-                sessionId,
                 expiresAt,
                 message: 'OTP sent successfully'
             };
         } else {
-            delete this.otpStore[sessionId]; // Clean up if SMS failed
             return {
                 success: false,
                 message: 'Failed to send OTP'
@@ -102,29 +105,39 @@ class TwilioOtpService {
     /**
      * Verify an OTP
      */
-    verifyOTP(sessionId: string, otp: string): { success: boolean; message: string } {
-        const otpRecord = this.otpStore[sessionId];
+    async verifyOTP(phoneNumber: string, otp: string): Promise<{ success: boolean; message: string }> {
 
-        // Check if OTP exists
-        if (!otpRecord) {
+        const user = await User.findOne({phone:phoneNumber}).select("+verifyCode +verifyCodeExpireOn +isVerified");
+
+        // check if user[phone] exist
+        if (!user) {
             return {
                 success: false,
-                message: 'Invalid session ID'
+                message: 'Invalid Phone Number'
             };
         }
-
-        // Check if OTP has expired
-        if (new Date() > otpRecord.expiresAt) {
-            delete this.otpStore[sessionId]; // Clean up expired OTP
+        // Check if OTP exists
+        if(!user.verifyCode || !user.verifyCodeExpireOn){
             return {
-                success: false,
-                message: 'OTP has expired'
-            };
+                success:false,
+                message:"No OTP found for this user"
+            }
+        }
+        // Check if OTP has expired
+        if (new Date() > user.verifyCodeExpireOn) {
+            return {
+                success:false,
+                message:"Expired OTP"
+            }
         }
 
         // Verify OTP
-        if (otpRecord.otp === otp) {
-            otpRecord.verified = true;
+        if (user.verifyCode === otp) {
+            user.isVerified = true;
+            // Clear OTP data after successful verification
+            user.verifyCode = undefined;
+            user.verifyCodeExpireOn = undefined;
+            await user.save();
             return {
                 success: true,
                 message: 'OTP verified successfully'
@@ -140,14 +153,15 @@ class TwilioOtpService {
     /**
      * Resend OTP
      */
-    async resendOTP(sessionId: string): Promise<{ success: boolean; expiresAt?: Date; message: string }> {
-        const otpRecord = this.otpStore[sessionId];
+    async resendOTP(phoneNumber: string): Promise<{ success: boolean; expiresAt?: Date; message: string }> {
+
+        const user = await User.findOne({ phone: phoneNumber }).select("+phone +isVerified +verifyCode +verifyCodeExpireOn");
 
         // Check if session exists
-        if (!otpRecord) {
+        if (!user) {
             return {
                 success: false,
-                message: 'Invalid session ID'
+                message: 'Invalid Phone Number'
             };
         }
 
@@ -159,12 +173,12 @@ class TwilioOtpService {
         expiresAt.setMinutes(expiresAt.getMinutes() + 10);
 
         // Update record
-        otpRecord.otp = newOtp;
-        otpRecord.expiresAt = expiresAt;
-        otpRecord.verified = false;
+        user.verifyCode = newOtp;
+        user.verifyCodeExpireOn = expiresAt;
+        user.isVerified = false;
 
         // Send new OTP via SMS
-        const smsSent = await this.sendSMS(otpRecord.phoneNumber, newOtp);
+        const smsSent = await this.sendSMS(phoneNumber, newOtp);
 
         if (smsSent) {
             return {
@@ -178,21 +192,6 @@ class TwilioOtpService {
                 message: 'Failed to resend OTP'
             };
         }
-    }
-
-    /**
-     * Start interval to cleanup expired OTPs
-     */
-    private startCleanupInterval(): void {
-        // Cleanup expired OTPs periodically (every 15 minutes)
-        setInterval(() => {
-            const now = new Date();
-            Object.keys(this.otpStore).forEach(sessionId => {
-                if (now > this.otpStore[sessionId].expiresAt) {
-                    delete this.otpStore[sessionId];
-                }
-            });
-        }, 15 * 60 * 1000); // 15 minutes
     }
 }
 

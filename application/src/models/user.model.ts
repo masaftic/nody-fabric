@@ -6,6 +6,7 @@ export interface IUser extends Document{
     phone?:string;
     isVerified?:boolean;
     verifyCode?:string;
+    verifyCodeExpireOn?:Date;
 }
 
 export interface IUserMethods{
@@ -37,6 +38,10 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
     verifyCode:{
         type:String,
         trim: true,
+        select:false
+    },
+    verifyCodeExpireOn:{
+        type:Date,
         select:false
     }
 },

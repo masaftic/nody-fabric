@@ -146,7 +146,7 @@ Response:
 ]
 ```
 
-### `GET /voters/certificate/:voter_id`
+### `GET /voters/:voter_id/certificate`
 
 Response:
 
@@ -177,7 +177,7 @@ Response:
 ]
 ```
 
-### `POST /voters/revoke/:voter_id`
+### `POST /voters/:voter_id/revoke`
 
 Request:
 
@@ -217,7 +217,7 @@ Response:
 
 ## **Voter API**
 
-### `POST voters/register`
+### `POST /voters/register`
 
 Request:
 
@@ -240,15 +240,20 @@ Response:
 }
 ```
 
-### `POST voters/verify/:voter_id`
+### `POST /voters/:voter_id/verify-phone`
+
+Request:
 
 ```json
-Request:
 {
     "verification_code": "string"
 }
 
+```
+
 Response:
+
+```json
 {
     "certificate": "string", // PEM encoded certificate
     "private_key": "string", // PEM encoded private key
@@ -256,7 +261,7 @@ Response:
 }
 ```
 
-### `POST voters/challenge/request`
+### `POST /voters/challenge/request`
 
 Request:
 
@@ -274,16 +279,20 @@ Response:
 }
 ```
 
-### `POST voters/challenge/verify`
+### `POST /voters/challenge/verify`
+
+Request:
 
 ```json
-Request:
 {
     "voter_id": "string",
     "challenge_response": "string" // base64 encoded response
 }
+```
 
 Response:
+
+```json
 {
     "access_token": "string" // JWT token
 }

@@ -14,7 +14,9 @@
             "program": "${workspaceFolder}/application/dist/index.js",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
-            ]
+            ],
+            "cwd": "${workspaceFolder}/application",
+            "envFile": "${workspaceFolder}/application/.env"
         }
     ]
 }

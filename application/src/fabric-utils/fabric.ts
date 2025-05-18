@@ -29,7 +29,7 @@ async function userSigner(userId: string): Promise<Signer> {
         logger.info('Custom signer: Signing digest:');
 
         // Simulate a delay (e.g., to mimic mobile device signing)
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // await new Promise(resolve => setTimeout(resolve, 200));
 
         const privateKey = crypto.createPrivateKey(privateKeyPEM);
         const signer = signers.newPrivateKeySigner(privateKey);
@@ -37,6 +37,24 @@ async function userSigner(userId: string): Promise<Signer> {
 
         logger.info('Custom signer: Generated signature');
 
+        return signature;
+    }
+}
+
+async function adminSigner(): Promise<Signer> {
+    const adminCredPath = path.join(adminWalletPath, '..', 'admin');
+    const keyPath = path.join(adminCredPath, 'key.pem');
+    const privateKeyPEM = await fs.readFile(keyPath);
+    
+    return async (digest: Uint8Array): Promise<Uint8Array> => {
+        logger.info('Admin signer: Signing digest');
+        
+        const privateKey = crypto.createPrivateKey(privateKeyPEM);
+        const signer = signers.newPrivateKeySigner(privateKey);
+        const signature = await signer(digest);
+        
+        logger.info('Admin signer: Generated signature');
+        
         return signature;
     }
 }
@@ -71,6 +89,34 @@ export async function fabricConnection(userId: string): Promise<[Gateway, grpc.C
         },
         commitStatusOptions: () => {
             return { deadline: Date.now() + 60000 }; // 1 minute
+        },
+    });
+
+    return [gateway, client];
+}
+
+export async function fabricAdminConnection(): Promise<[Gateway, grpc.Client]> {
+    const client = await newGrpcConnection();
+
+    const gateway = connect({
+        client,
+        identity: await adminIdentity(),
+        signer: await adminSigner(),
+ 
+        hash: hash.sha256,
+
+        // Default timeouts for different gRPC calls - may need longer timeouts for admin operations
+        evaluateOptions: () => {
+            return { deadline: Date.now() + 10000 }; // 10 seconds
+        },
+        endorseOptions: () => {
+            return { deadline: Date.now() + 30000 }; // 30 seconds
+        },
+        submitOptions: () => {
+            return { deadline: Date.now() + 10000 }; // 10 seconds
+        },
+        commitStatusOptions: () => {
+            return { deadline: Date.now() + 120000 }; // 2 minutes
         },
     });
 

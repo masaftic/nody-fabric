@@ -1,17 +1,27 @@
 import express, { NextFunction, Request, Response } from 'express';
 import { logger } from './logger';
-import { caURL, fabricCaTlsCertPath } from './fabric-utils/config';
+import { caURL, fabricCaTlsCertPath, tlsCertPath } from './fabric-utils/config';
 import { IdentityManager } from './fabric-utils/identityManager';
-import { VotingContractController } from './fabric-utils/votingContractController';
-import { fabricConnection } from './fabric-utils/fabric';
-import {mainRouter} from "./routes/main.route";
-import {userRouter} from "./routes/user.route";
-import {votesRouter} from "./routes/votes.route";
-import {electionRouter} from "./routes/election.route";
-import {ledgerRouter} from "./routes/ledger.route";
+import { BlockChainRepository } from './fabric-utils/votingContractController';
+import { fabricConnection, fabricAdminConnection } from './fabric-utils/fabric';
+import { mainRouter } from "./routes/main.route";
+import { userRouter } from "./routes/user.route";
+import { votesRouter } from "./routes/votes.route";
+import { electionRouter } from "./routes/election.route";
+import { ledgerRouter } from "./routes/ledger.route";
+import connectDb, { isDbConnected } from './config/connectToDbAtlas';
+import { initFabricEventService } from './service/fabric-event.service';
 
 export const createServerApp = async () => {
     const app = express();
+
+    // Connect to MongoDB
+    const dbConnected = await connectDb();
+    if (!dbConnected) {
+        logger.warn('Starting server without MongoDB connection. Some features may not work properly.');
+    } else {
+        logger.info('MongoDB connected successfully');
+    }
 
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
@@ -21,170 +31,61 @@ export const createServerApp = async () => {
         next();
     });
 
-    // app.get('/api', (req, res) => {
-    //     res.send('Hello World!');
-    // });
-    app.use("/api/test",mainRouter)
-    // app.post('/api/users/register', async (req: Request, res: Response) => {
-    //     const identityManager = new IdentityManager(caURL, fabricCaTlsCertPath);
-    //
-    //     const admin = await identityManager.enrollAdmin();
-    //     const secret = await identityManager.registerUser(admin, req.body.userId, req.body.affiliation, req.body.role)
-    //
-    //     const userEnrollment = await identityManager.enrollUser(req.body.userId, secret);
-    //
-    //     res.status(201).json({
-    //         message: 'User registered successfully',
-    //         certificate: userEnrollment.certificate,
-    //         key: userEnrollment.key.toBytes(),
-    //     });
-    // })
+    // Initialize Fabric event service for admin user if MongoDB is connected
+    if (dbConnected) {
+        try {
+            // Enroll admin
+            const identityManager = new IdentityManager(caURL, tlsCertPath);
+            await identityManager.enrollAdmin();
 
-    app.use("/api/user",userRouter)
+            // Use admin connection to Fabric for event service
+            const [gateway, client] = await fabricAdminConnection();
+            const network = gateway.getNetwork('mychannel');
 
-    // app.post('/api/votes', async (req: Request, res: Response) => {
-    //     const { userId, electionId, candidateId } = req.body;
-    //     if (!userId || !electionId || !candidateId) {
-    //         res.status(400).json({ message: 'Missing required fields' });
-    //         return;
-    //     }
-    //
-    //     const [gateway, client] = await fabricConnection(userId);
-    //     try {
-    //         const contract = gateway.getNetwork('mychannel').getContract('basic');
-    //         const votingController = new VotingContractController(contract);
-    //         await votingController.castVote(crypto.randomUUID(), electionId, candidateId);
-    //         res.status(200).json({ message: 'Vote cast successfully' });
-    //         return;
-    //     } finally {
-    //         gateway.close();
-    //         client.close();
-    //     }
-    // });
-    //
-    // app.get('/api/votes/:voteId', async (req: Request, res: Response) => {
-    //     const { userId } = req.body;
-    //     const { voteId } = req.params;
-    //     if (!userId || !voteId) {
-    //         res.status(400).json({ message: 'Missing required fields' });
-    //         return;
-    //     }
-    //
-    //     const [gateway, client] = await fabricConnection(userId);
-    //     try {
-    //         const contract = gateway.getNetwork('mychannel').getContract('basic');
-    //         const votingController = new VotingContractController(contract);
-    //         const result = await votingController.getVote(voteId);
-    //         res.status(200).json({ message: 'Vote retrieved successfully', result });
-    //         return;
-    //     } finally {
-    //         gateway.close();
-    //         client.close();
-    //     }
-    // });
-    //
-    // app.get('/api/votes', async (req: Request, res: Response) => {
-    //     const { userId } = req.body;
-    //     if (!userId) {
-    //         res.status(400).json({ message: 'Missing required fields' });
-    //         return;
-    //     }
-    //
-    //     const [gateway, client] = await fabricConnection(userId);
-    //     try {
-    //         const contract = gateway.getNetwork('mychannel').getContract('basic');
-    //         const votingController = new VotingContractController(contract);
-    //         const result = await votingController.getAllVotes();
-    //         res.status(200).json({ message: 'Votes retrieved successfully', result });
-    //         return;
-    //     } finally {
-    //         gateway.close();
-    //         client.close();
-    //     }
-    // });
+            // Initialize and start the event service
+            const eventService = initFabricEventService(network);
+            await eventService.syncInitialData('admin');
+            await eventService.startListening();
 
-    app.use("/api/vote",votesRouter)
-    // app.get('/api/elections/:electionId', async (req: Request, res: Response) => {
-    //     const { userId } = req.body;
-    //     const { electionId } = req.params;
-    //     if (!userId || !electionId) {
-    //         res.status(400).json({ message: 'Missing required fields' });
-    //         return;
-    //     }
-    //
-    //     const [gateway, client] = await fabricConnection(userId);
-    //     try {
-    //         const contract = gateway.getNetwork('mychannel').getContract('basic');
-    //         const votingController = new VotingContractController(contract);
-    //         const result = await votingController.getElection(electionId);
-    //         res.status(200).json({ message: 'Election retrieved successfully', result });
-    //         return;
-    //     } finally {
-    //         gateway.close();
-    //         client.close();
-    //     }
-    // });
-    app.use("/api/election",electionRouter)
+            logger.info('Fabric event service initialized and started');
 
-    // app.post('/api/ledger/init', async (req: Request, res: Response) => {
-    //     if (!req.body.userId) {
-    //         res.status(400).json({ message: 'Missing required fields' });
-    //         return;
-    //     }
-    //
-    //     const [gateway, client] = await fabricConnection(req.body.userId);
-    //     try {
-    //         const contract = gateway.getNetwork('mychannel').getContract('basic');
-    //         const votingController = new VotingContractController(contract);
-    //         await votingController.initLedger();
-    //         res.status(201).json({ message: 'ledger initialized successfully' });
-    //         return;
-    //     } finally {
-    //         gateway.close();
-    //         client.close();
-    //     }
-    // });
+            // Don't close the connection - we need it for the event listeners
+            // We'll handle proper shutdown in the process termination handlers
 
-    // app.get('/api/ledger', async (req: Request, res: Response) => {
-    //     if (!req.body.userId) {
-    //         res.status(400).json({ message: 'Missing required fields' });
-    //         return;
-    //     }
-    //
-    //     const [gateway, client] = await fabricConnection(req.body.userId);
-    //     try {
-    //         const contract = gateway.getNetwork('mychannel').getContract('basic');
-    //         const votingController = new VotingContractController(contract);
-    //         const result = await votingController.getWorldState();
-    //         res.status(200).json({ message: 'Vote cast successfully', result });
-    //         return;
-    //     } finally {
-    //         gateway.close();
-    //         client.close();
-    //     }
-    // });
+            // Set up process termination handlers
+            process.on('SIGINT', async () => {
+                logger.info('Received SIGINT. Closing Fabric connection and shutting down.');
+                gateway.close();
+                client.close();
+                process.exit(0);
+            });
 
-    // app.delete('/api/ledger/clear', async (req: Request, res: Response) => {
-    //     if (!req.body.userId) {
-    //         res.status(400).json({ message: 'Missing required fields' });
-    //         return;
-    //     }
-    //
-    //     const [gateway, client] = await fabricConnection(req.body.userId);
-    //     try {
-    //         const contract = gateway.getNetwork('mychannel').getContract('basic');
-    //         const votingController = new VotingContractController(contract);
-    //         await votingController.clearVotes();
-    //         await votingController.clearElections();
-    //         res.status(200).json({ message: 'Ledger cleared successfully' });
-    //         return;
-    //     } finally {
-    //         gateway.close();
-    //         client.close();
-    //     }
-    // });
+            process.on('SIGTERM', async () => {
+                logger.info('Received SIGTERM. Closing Fabric connection and shutting down.');
+                gateway.close();
+                client.close();
+                process.exit(0);
+            });
 
-    app.use("/api/ledger",ledgerRouter)
+        } catch (error) {
+            logger.error(`Failed to initialize Fabric event service: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    app.use("/api/test", mainRouter);
+    app.use("/api/user", userRouter);
+    app.use("/api/vote", votesRouter);
+    app.use("/api/election", electionRouter);
+    app.use("/api/ledger", ledgerRouter);
+
+    // Add a health check endpoint
+    app.get('/health', (req: Request, res: Response) => {
+        res.status(200).json({
+            status: 'UP',
+            timestamp: new Date().toISOString(),
+            mongodb: isDbConnected() ? 'Connected' : 'Disconnected'
+        });
+    });
 
     app.use((req: Request, res: Response) => {
         res.status(404).json({

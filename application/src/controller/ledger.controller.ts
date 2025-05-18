@@ -1,6 +1,6 @@
 import {Request, Response} from "express";
 import {fabricConnection} from "../fabric-utils/fabric";
-import {VotingContractController} from "../fabric-utils/votingContractController";
+import {BlockChainRepository} from "../fabric-utils/votingContractController";
 import {StatusCodes} from "http-status-codes";
 
 const init = async (req: Request, res: Response) => {
@@ -12,7 +12,7 @@ const init = async (req: Request, res: Response) => {
     const [gateway, client] = await fabricConnection(req.body.userId);
     try {
         const contract = gateway.getNetwork('mychannel').getContract('basic');
-        const votingController = new VotingContractController(contract);
+        const votingController = new BlockChainRepository(contract);
         await votingController.initLedger();
         res.status(StatusCodes.CREATED).json({ message: 'ledger initialized successfully' });
         return;
@@ -31,7 +31,7 @@ const voteCast = async (req: Request, res: Response) => {
     const [gateway, client] = await fabricConnection(req.body.userId);
     try {
         const contract = gateway.getNetwork('mychannel').getContract('basic');
-        const votingController = new VotingContractController(contract);
+        const votingController = new BlockChainRepository(contract);
         const result = await votingController.getWorldState();
         res.status(StatusCodes.OK).json({ message: 'Vote cast successfully', result });
         return;
@@ -50,8 +50,8 @@ const clear = async (req: Request, res: Response) => {
     const [gateway, client] = await fabricConnection(req.body.userId);
     try {
         const contract = gateway.getNetwork('mychannel').getContract('basic');
-        const votingController = new VotingContractController(contract);
-        await votingController.clearVotes();
+        const votingController = new BlockChainRepository(contract);
+        // await votingController.clearVotes();
         await votingController.clearElections();
         res.status(StatusCodes.OK).json({ message: 'Ledger cleared successfully' });
         return;

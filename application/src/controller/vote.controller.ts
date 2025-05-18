@@ -1,6 +1,6 @@
 import {Request, Response} from "express";
 import {fabricConnection} from "../fabric-utils/fabric";
-import {VotingContractController} from "../fabric-utils/votingContractController";
+import {BlockChainRepository} from "../fabric-utils/votingContractController";
 import {StatusCodes} from "http-status-codes";
 
 const vote =  async (req: Request, res: Response) => {
@@ -13,9 +13,9 @@ const vote =  async (req: Request, res: Response) => {
     const [gateway, client] = await fabricConnection(userId);
     try {
         const contract = gateway.getNetwork('mychannel').getContract('basic');
-        const votingController = new VotingContractController(contract);
-        await votingController.castVote(crypto.randomUUID(), electionId, candidateId);
-        res.status(StatusCodes.OK).json({ message: 'Vote cast successfully' });
+        // const votingController = new VotingContractController(contract);
+        // await votingController.castVote(crypto.randomUUID(), electionId, candidateId);
+        // res.status(StatusCodes.OK).json({ message: 'Vote cast successfully' });
         return;
     } finally {
         gateway.close();
@@ -35,9 +35,9 @@ const getVote =  async (req: Request, res: Response) => {
     const [gateway, client] = await fabricConnection(userId);
     try {
         const contract = gateway.getNetwork('mychannel').getContract('basic');
-        const votingController = new VotingContractController(contract);
-        const result = await votingController.getVote(voteId);
-        res.status(StatusCodes.OK).json({ message: 'Vote retrieved successfully', result });
+        const votingController = new BlockChainRepository(contract);
+        // const result = await votingController.getVote(voteId);
+        // res.status(StatusCodes.OK).json({ message: 'Vote retrieved successfully', result });
         return;
     } finally {
         gateway.close();
@@ -55,9 +55,9 @@ const getVotes = async (req: Request, res: Response) => {
     const [gateway, client] = await fabricConnection(userId);
     try {
         const contract = gateway.getNetwork('mychannel').getContract('basic');
-        const votingController = new VotingContractController(contract);
-        const result = await votingController.getAllVotes();
-        res.status(StatusCodes.OK).json({ message: 'Votes retrieved successfully', result });
+        const votingController = new BlockChainRepository(contract);
+        // const result = await votingController.getAllVotes();
+        // res.status(StatusCodes.OK).json({ message: 'Votes retrieved successfully', result });
         return;
     } finally {
         gateway.close();

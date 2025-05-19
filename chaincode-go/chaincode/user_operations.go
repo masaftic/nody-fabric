@@ -10,29 +10,23 @@ import (
 )
 
 // RegisterUser registers a new user in the system
-func (s *VotingContract) RegisterUser(ctx contractapi.TransactionContextInterface, governorate string) error {
-	// Get the client identity for the user registering
-	id, err := ctx.GetClientIdentity().GetID()
-	if err != nil {
-		return fmt.Errorf("failed to get client identity: %v", err)
-	}
-
+func (s *VotingContract) RegisterUser(ctx contractapi.TransactionContextInterface, userId string, governorate string) error {
 	// Check if user already exists
-	userJSON, err := ctx.GetStub().GetState(userPrefix + id)
+	userJSON, err := ctx.GetStub().GetState(userPrefix + userId)
 	if err != nil {
 		return fmt.Errorf("failed to read from world state: %v", err)
 	}
 	if userJSON != nil {
-		return fmt.Errorf("user already exists with ID: %s", id)
+		return fmt.Errorf("user already exists with ID: %s", userId)
 	}
 
 	// Create new user
 	user := User{
-		ID:             id,
-		Governorate:    governorate,
-		VotedElections: []string{},
-		Role:           "voter", // Default role
-		Status:         "active",
+		ID:               userId,
+		Governorate:      governorate,
+		VotedElectionIds: []string{},
+		Role:             "voter", // Default role
+		Status:           "active",
 	}
 
 	userJSON, err = json.Marshal(user)
@@ -40,7 +34,7 @@ func (s *VotingContract) RegisterUser(ctx contractapi.TransactionContextInterfac
 		return err
 	}
 
-	return ctx.GetStub().PutState(userPrefix+id, userJSON)
+	return ctx.GetStub().PutState(userPrefix+userId, userJSON)
 }
 
 // GetUser retrieves a user by ID

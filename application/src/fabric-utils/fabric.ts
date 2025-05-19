@@ -1,4 +1,4 @@
-import { connect, Gateway, hash, Identity, Signer } from "@hyperledger/fabric-gateway";
+import { connect, Contract, Gateway, hash, Identity, Signer } from "@hyperledger/fabric-gateway";
 import * as grpc from '@grpc/grpc-js';
 import { adminWalletPath, mspId, peerEndpoint, peerHostAlias, tlsCertPath, usersWalletPath } from "./config";
 import * as fs from 'fs/promises';
@@ -45,16 +45,16 @@ async function adminSigner(): Promise<Signer> {
     const adminCredPath = path.join(adminWalletPath, '..', 'admin');
     const keyPath = path.join(adminCredPath, 'key.pem');
     const privateKeyPEM = await fs.readFile(keyPath);
-    
+
     return async (digest: Uint8Array): Promise<Uint8Array> => {
         logger.info('Admin signer: Signing digest');
-        
+
         const privateKey = crypto.createPrivateKey(privateKeyPEM);
         const signer = signers.newPrivateKeySigner(privateKey);
         const signature = await signer(digest);
-        
+
         logger.info('Admin signer: Generated signature');
-        
+
         return signature;
     }
 }
@@ -74,7 +74,7 @@ export async function fabricConnection(userId: string): Promise<[Gateway, grpc.C
         client,
         identity: await userIdentity(userId),
         signer: await userSigner(userId),
- 
+
         hash: hash.sha256,
 
         // Default timeouts for different gRPC calls
@@ -102,7 +102,7 @@ export async function fabricAdminConnection(): Promise<[Gateway, grpc.Client]> {
         client,
         identity: await adminIdentity(),
         signer: await adminSigner(),
- 
+
         hash: hash.sha256,
 
         // Default timeouts for different gRPC calls - may need longer timeouts for admin operations
@@ -121,4 +121,32 @@ export async function fabricAdminConnection(): Promise<[Gateway, grpc.Client]> {
     });
 
     return [gateway, client];
+}
+
+
+export async function withFabricAdminConnection<T>(
+    callback: (contract: Contract) => Promise<T>
+): Promise<T> {
+    const [gateway, client] = await fabricAdminConnection();
+    try {
+        const contract = gateway.getNetwork('mychannel').getContract('basic');
+        return await callback(contract); // Execute the callback and return its result
+    } finally {
+        client.close();
+        gateway.close();
+    }
+}
+
+export async function withFabricConnection<T>(
+    userId: string,
+    callback: (contract: Contract) => Promise<T>
+): Promise<T> {
+    const [gateway, client] = await fabricConnection(userId);
+    try {
+        const contract = gateway.getNetwork('mychannel').getContract('basic');
+        return await callback(contract); // Execute the callback and return its result
+    } finally {
+        client.close();
+        gateway.close();
+    }
 }

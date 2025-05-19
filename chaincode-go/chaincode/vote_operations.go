@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
@@ -31,8 +32,8 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 		return fmt.Errorf("the election %s is not active", electionID)
 	}
 
-	// Get voter ID and validate user
-	voterId, err := ctx.GetClientIdentity().GetID()
+	// Get voter ID by extracting CN from client identity
+	voterId, err := extractCN(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get voter ID: %v", err)
 	}
@@ -58,7 +59,7 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 	}
 
 	// Check if user has already voted in this election
-	if slices.Contains(user.VotedElections, electionID) {
+	if slices.Contains(user.VotedElectionIds, electionID) {
 		return fmt.Errorf("user has already voted in this election")
 	}
 
@@ -68,7 +69,14 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 	}
 
 	// Check if candidate is valid for this election
-	if !slices.Contains(election.CandidateIds, candidateID) {
+	isValidCandidate := false
+	for _, candidate := range election.Candidates {
+		if candidate.CandidateID == candidateID {
+			isValidCandidate = true
+			break
+		}
+	}
+	if !isValidCandidate {
 		return fmt.Errorf("invalid candidate ID: %s", candidateID)
 	}
 
@@ -82,6 +90,7 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 		ElectionID:  electionID,
 		CandidateID: candidateID,
 		Receipt:     receiptHex,
+		CreatedAt:   time.Now().Format(time.RFC3339),
 	}
 	voteJSON, err := json.Marshal(vote)
 	if err != nil {
@@ -89,7 +98,7 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 	}
 
 	// Update user's voting history
-	user.VotedElections = append(user.VotedElections, electionID)
+	user.VotedElectionIds = append(user.VotedElectionIds, electionID)
 	updatedUserJSON, err := json.Marshal(user)
 	if err != nil {
 		return err
@@ -99,6 +108,27 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 	err = ctx.GetStub().PutState(votePrefix+voteID, voteJSON)
 	if err != nil {
 		return err
+	}
+
+	// Emit a vote_cast event for external observers
+	voteEvent := struct {
+		VoteID      string `json:"vote_id"`
+		ElectionID  string `json:"electionId"`
+		CandidateID string `json:"candidateId"`
+	}{
+		VoteID:      voteID,
+		ElectionID:  electionID,
+		CandidateID: candidateID,
+	}
+
+	eventJSON, err := json.Marshal(voteEvent)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.GetStub().SetEvent("vote_cast", eventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to emit vote_cast event: %v", err)
 	}
 
 	return ctx.GetStub().PutState(userPrefix+voterId, updatedUserJSON)

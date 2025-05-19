@@ -2,7 +2,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import { logger } from './logger';
 import { caURL, fabricCaTlsCertPath, tlsCertPath } from './fabric-utils/config';
 import { IdentityManager } from './fabric-utils/identityManager';
-import { BlockChainRepository } from './fabric-utils/votingContractController';
+import { BlockChainRepository } from './fabric-utils/BlockChainRepository';
 import { fabricConnection, fabricAdminConnection } from './fabric-utils/fabric';
 import { mainRouter } from "./routes/main.route";
 import { userRouter } from "./routes/user.route";
@@ -15,12 +15,12 @@ import { initFabricEventService } from './service/fabric-event.service';
 export const createServerApp = async () => {
     const app = express();
 
-    // Connect to MongoDB
+    // Connect to MongoDB (only used for user data and vote records)
     const dbConnected = await connectDb();
     if (!dbConnected) {
-        logger.warn('Starting server without MongoDB connection. Some features may not work properly.');
+        logger.warn('Starting server without MongoDB connection. User authentication and vote tracking will not work properly.');
     } else {
-        logger.info('MongoDB connected successfully');
+        logger.info('MongoDB connected successfully (used for user data and vote tracking only)');
     }
 
     app.use(express.json());
@@ -31,7 +31,7 @@ export const createServerApp = async () => {
         next();
     });
 
-    // Initialize Fabric event service for admin user if MongoDB is connected
+    // Initialize Fabric event service for admin user
     if (dbConnected) {
         try {
             // Enroll admin
@@ -44,7 +44,7 @@ export const createServerApp = async () => {
 
             // Initialize and start the event service
             const eventService = initFabricEventService(network);
-            await eventService.syncInitialData('admin');
+            await eventService.syncInitialData();
             await eventService.startListening();
 
             logger.info('Fabric event service initialized and started');
@@ -73,9 +73,9 @@ export const createServerApp = async () => {
     }
 
     app.use("/api/test", mainRouter);
-    app.use("/api/user", userRouter);
-    app.use("/api/vote", votesRouter);
-    app.use("/api/election", electionRouter);
+    app.use("/api/users", userRouter);
+    app.use("/api/votes", votesRouter);
+    app.use("/api/elections", electionRouter);
     app.use("/api/ledger", ledgerRouter);
 
     // Add a health check endpoint
@@ -83,7 +83,7 @@ export const createServerApp = async () => {
         res.status(200).json({
             status: 'UP',
             timestamp: new Date().toISOString(),
-            mongodb: isDbConnected() ? 'Connected' : 'Disconnected'
+            mongodb: isDbConnected() ? 'Connected (user data & vote tracking)' : 'Disconnected'
         });
     });
 

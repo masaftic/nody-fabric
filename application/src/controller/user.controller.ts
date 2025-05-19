@@ -1,29 +1,66 @@
-import {Request, Response} from "express";
-import {IdentityManager} from "../fabric-utils/identityManager";
-import {caURL, fabricCaTlsCertPath} from "../fabric-utils/config";
-import {StatusCodes} from "http-status-codes";
-import {twilioService} from "../service/twilio.service";
+import { Request, Response } from "express";
+import { IdentityManager } from "../fabric-utils/identityManager";
+import { caURL, fabricCaTlsCertPath } from "../fabric-utils/config";
+import { StatusCodes } from "http-status-codes";
+import { twilioService } from "../service/twilio.service";
 import verifyPhoneNumber from "../utils/verifyPhoneNumber";
 import BadRequestError from "../errors/BadRequest.error";
+import { userService } from '../service/user.service';
+import UserModel, { UserRegisterRequest } from '../models/user.model';
+import { fabricAdminConnection, fabricConnection, withFabricAdminConnection } from "../fabric-utils/fabric";
+import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
 
 
-const register =  async (req: Request, res: Response) => {
+async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response) {
+    if (!req.body.nationalId || !req.body.phone || !req.body.governorate) {
+        res.status(StatusCodes.BAD_REQUEST).json({
+            message: 'Missing required fields'
+        });
+        return;
+    }
+
     const identityManager = new IdentityManager(caURL, fabricCaTlsCertPath);
+    const userId = crypto.randomUUID(); // voterId
 
-    const admin = await identityManager.enrollAdmin();
-    const secret = await identityManager.registerUser(admin, req.body.userId, req.body.affiliation, req.body.role)
+    try {
+        const admin = await identityManager.enrollAdmin();
+        const secret = await identityManager.registerUser(admin, userId, '', 'voter');
 
-    const userEnrollment = await identityManager.enrollUser(req.body.userId, secret);
+        const userEnrollment = await identityManager.enrollUser(userId, secret);
 
-    res.status(StatusCodes.CREATED).json({
-        message: 'User registered successfully',
-        certificate: userEnrollment.certificate,
-        key: userEnrollment.key.toBytes(),
-    });
+        // Save user details in MongoDB
+        const userData = new UserModel({
+            userId,
+            nationalId: req.body.nationalId,
+            phone: req.body.phone,
+            governorate: req.body.governorate,
+            certificate: userEnrollment.certificate,
+            role: 'voter',
+            status: 'active',
+        });
+
+        await userService.saveUser(userData);
+
+        await withFabricAdminConnection(async (contract) => {
+            const votingController = new BlockChainRepository(contract);
+            await votingController.registerUser(userId, req.body.governorate);
+        });
+
+        res.status(StatusCodes.CREATED).json({
+            message: 'User registered successfully',
+            userId,
+            certificate: userEnrollment.certificate,
+            key: userEnrollment.key.toBytes(),
+        });
+    } catch (error: any) {
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: `Error registering user: ${error.message}}`
+        });
+    }
 }
 
-const sendOtp = async (req : Request, res:Response) => {
-    const {phoneNumber} = req.body;
+const sendOtp = async (req: Request, res: Response) => {
+    const { phoneNumber } = req.body;
     if (!phoneNumber || !verifyPhoneNumber(phoneNumber))
         throw new BadRequestError("InValid Phone Number");
     const twilioResponse: {
@@ -42,8 +79,8 @@ const sendOtp = async (req : Request, res:Response) => {
     })
 }
 
-const resendOtp = async (req : Request, res:Response) => {
-    const {phoneNumber} = req.body;
+const resendOtp = async (req: Request, res: Response) => {
+    const { phoneNumber } = req.body;
     if (!phoneNumber || !verifyPhoneNumber(phoneNumber))
         throw new BadRequestError("InValid Phone Number");
     const twilioResponse: {
@@ -61,14 +98,14 @@ const resendOtp = async (req : Request, res:Response) => {
         message: twilioResponse.message
     })
 }
-const verifyOtp = async (req : Request, res:Response) => {
-    const {phoneNumber, otp} = req.body;
+const verifyOtp = async (req: Request, res: Response) => {
+    const { phoneNumber, otp } = req.body;
     if (!otp || !phoneNumber || !verifyPhoneNumber(phoneNumber))
         throw new BadRequestError("Missing input fields");
     const twilioResponse: {
         success: boolean;
         message: string
-    } = await twilioService.verifyOTP(phoneNumber,otp)
+    } = await twilioService.verifyOTP(phoneNumber, otp)
     if (!twilioResponse.success) {
         res.status(StatusCodes.BAD_REQUEST).json({
             message: twilioResponse
@@ -79,5 +116,7 @@ const verifyOtp = async (req : Request, res:Response) => {
         message: twilioResponse.message
     })
 }
-export {register as userRegister, sendOtp as sendSmsOtp,
-    resendOtp as resendSmsOtp, verifyOtp as verifySmsOtp}
+export {
+    register as userRegister, sendOtp as sendSmsOtp,
+    resendOtp as resendSmsOtp, verifyOtp as verifySmsOtp
+}

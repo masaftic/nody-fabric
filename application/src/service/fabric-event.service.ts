@@ -1,11 +1,10 @@
-import { Contract, Network, checkpointers, ChaincodeEvent } from '@hyperledger/fabric-gateway';
+import { Contract, Network, checkpointers } from '@hyperledger/fabric-gateway';
 import { logger } from '../logger';
-import { electionDataService, pendingMetadata } from './election.service';
-import { BlockChainRepository } from '../fabric-utils/votingContractController';
-import { BlockchainElection } from '../models/election.model';
+import { BlockChainRepository } from '../fabric-utils/BlockChainRepository';
+import { Election } from '../models/election.model';
 
 /**
- * Service to handle Fabric events for real-time updates to MongoDB
+ * Service to handle Fabric events for logging and real-time updates
  */
 export class FabricEventService {
   private contract: Contract;
@@ -58,8 +57,6 @@ export class FabricEventService {
         try {
           const events = await this.network.getBlockEvents({
             checkpoint: blockCheckpointer,
-            // Uncomment and set a starting block if needed
-            // startBlock: BigInt(1),
           });
 
           try {
@@ -68,18 +65,6 @@ export class FabricEventService {
             for await (const event of events) {
               try {
                 logger.debug(`Received block event: Block #${event.getHeader()?.getNumber()}`);
-
-                // Process the block event
-                // For now, we'll periodically fetch all elections
-                // const votingController = new VotingContractController(this.contract);
-                // const elections = await votingController.getAllElections();
-
-                // // Update our MongoDB with latest blockchain data
-                // for (const election of elections) {
-                //   await electionDataService.saveElection(election);
-                //   await votingController.computeVoteTally(election.election_id);
-                //   // Analytics removed for simplification
-                // }
 
                 // Checkpoint after processing the block
                 const blockNumber = event.getHeader()?.getNumber();
@@ -122,13 +107,9 @@ export class FabricEventService {
     (async () => {
       while (true) {
         try {
-          const events = await this.network.getChaincodeEvents(this.chaincodeName
-            , {
+          const events = await this.network.getChaincodeEvents(this.chaincodeName, {
             checkpoint: chaincodeCheckpointer,
-            // Uncomment and set a starting block if needed
-            // startBlock: BigInt(1),
-          }
-            );
+          });
 
           try {
             logger.info('Chaincode event listener started successfully');
@@ -141,44 +122,30 @@ export class FabricEventService {
                 // Process different event types based on the event name
                 switch (event.eventName) {
                   case 'vote_cast':
-                    // Vote handling removed for simplification
                     const voteData = JSON.parse(Buffer.from(event.payload).toString());
                     logger.info(`Vote cast for election ${voteData.electionId}`);
+                    await this.handleVoteCast(voteData);
                     break;
 
                   case 'election_created':
                     logger.info('Processing election created event');
-                    // Process blockchain election data
-                    const blockchainElectionData: BlockchainElection = JSON.parse(Buffer.from(event.payload).toString());
-                    
-                    await this.handleElectionCreated(blockchainElectionData);
+                    const electionData: Election = JSON.parse(Buffer.from(event.payload).toString());
+                    await this.handleElectionCreated(electionData);
                     break;
 
                   case 'election_updated':
-                    // Process updated blockchain election data
-                    const updatedBlockchainData = JSON.parse(Buffer.from(event.payload).toString());
-                    await this.handleElectionUpdated(updatedBlockchainData);
+                    const updatedData = JSON.parse(Buffer.from(event.payload).toString());
+                    await this.handleElectionUpdated(updatedData);
                     break;
 
                   case 'tally_computed':
-                    // Parse payload to get the election ID
-                    // const tallyData = JSON.parse(Buffer.from(event.payload).toString());
-                    // const electionId = tallyData.electionId || tallyData.election_id;
-                    
-                    // if (electionId) {
-                    //   // Just log that we received the tally event - analytics removed for simplification
-                    //   logger.info(`Received vote tally event for election ${electionId}`);
-                    // } else {
-                    //   logger.error('Tally computed event received without election ID');
-                    // }
+                    const tallyData = JSON.parse(Buffer.from(event.payload).toString());
+                    logger.info(`Tally computed for election ${tallyData.electionId || tallyData.election_id}`);
                     break;
 
                   default:
                     logger.info(`Unhandled chaincode event: ${event.eventName}`);
                 }
-
-                // Checkpoint after processing
-                // await chaincodeCheckpointer.checkpointChaincodeEvent(event);
 
               } catch (processError) {
                 logger.error(`Error processing chaincode event: ${processError instanceof Error ? processError.message : String(processError)}`);
@@ -208,12 +175,24 @@ export class FabricEventService {
     logger.info('Creating sample test election');
     
     const sampleElection = {
-      election_id: 'test-election-002' + Math.floor(Math.random() * 1000),
       name: 'Initial Election',
-      candidate_ids: [
-        'candidate-001',
-        'candidate-002',
-        'candidate-003'
+      description: 'Sample test election created automatically',
+      candidates: [
+        {
+          name: 'Candidate 1',
+          party: 'Party A',
+          profile_image: 'image1.png'
+        },
+        {
+          name: 'Candidate 2',
+          party: 'Party B',
+          profile_image: 'image2.png'
+        },
+        {
+          name: 'Candidate 3',
+          party: 'Independent',
+          profile_image: 'image3.png'
+        }
       ],
       start_time: new Date().toISOString(),
       end_time: new Date(Date.now() + 86400000).toISOString(), // 1 day later
@@ -225,9 +204,9 @@ export class FabricEventService {
   }
   
   /**
-   * Sync blockchain elections to MongoDB
+   * Verify blockchain elections integrity
    */
-  private async syncElectionsToMongoDB(): Promise<void> {
+  private async verifyBlockchainElections(): Promise<void> {
     const votingController = new BlockChainRepository(this.contract);
     
     // Get all elections
@@ -238,37 +217,28 @@ export class FabricEventService {
       return;
     }
 
-    // Save all elections to MongoDB and update tallies
+    // Verify elections and compute tallies if needed
     for (const election of elections) {
-      await electionDataService.saveElection(election);
-      
-      // // Compute the current tally for the election
-      // await votingController.computeVoteTally(election.election_id);
-      
-      // // Get the updated election with vote tally
-      // const updatedElection = await votingController.getElection(election.election_id);
-      // await electionDataService.saveElection(updatedElection);
+      // Compute the current tally for the election (optional, can be commented out)
+      await votingController.computeVoteTally(election.election_id);
     }
     
-    logger.info(`Synced ${elections.length} elections to MongoDB`);
+    logger.info(`Verified ${elections.length} elections on the blockchain`);
   }
 
   /**
-   * Initialize by syncing all current data from blockchain to MongoDB
+   * Initialize by verifying blockchain data
    */
-  async syncInitialData(userId: string): Promise<void> {
+  async syncInitialData(): Promise<void> {
     try {
-      logger.info('Syncing initial data from blockchain to MongoDB');
+      logger.info('Verifying blockchain data integrity');
       
       await this.createSampleElection();
-      await this.syncElectionsToMongoDB();
+      // await this.verifyBlockchainElections();
 
-      // In a real implementation, we would also sync votes
-      // This would require a GetAllVotes method in the chaincode
-
-      logger.info('Initial data sync completed');
+      logger.info('Initial data verification completed');
     } catch (error) {
-      logger.error(`Error syncing initial data: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(`Error verifying blockchain data: ${error instanceof Error ? error.message : String(error)}`);
       console.log(JSON.stringify(error));
       throw error;
     }
@@ -276,88 +246,34 @@ export class FabricEventService {
 
   /**
    * Handle election created event
-   * @param blockchainData The blockchain election data
+   * @param electionData The election data
    */
-  private async handleElectionCreated(blockchainData: BlockchainElection): Promise<void> {
-    const electionId = blockchainData.election_id;
+  private async handleElectionCreated(electionData: Election): Promise<void> {
+    const electionId = electionData.election_id;
+    logger.info(`Election ${electionId} created on blockchain: "${electionData.name}"`);
     
-    // Check if we have UI metadata pending for this election
-    const pendingData = pendingMetadata.get(electionId);
-    
-    // Base election data from blockchain
-    const baseElection = {
-      ...blockchainData
-    };
-    
-    if (pendingData) {
-      // Create a complete election record with blockchain data + UI metadata
-      await electionDataService.saveElection({
-        ...baseElection,
-        description: pendingData.description || "Created on blockchain",
-        candidates: pendingData.candidates
-      });
-      
-      // Remove the metadata from the pending map as we've used it
-      pendingMetadata.delete(electionId);
-      logger.info(`Created complete election record with UI metadata for ${electionId}`);
-    } else {
-      // We don't have UI metadata, just use the blockchain data with placeholders
-      await electionDataService.saveElection({
-        ...baseElection,
-        description: "Created on blockchain", // Placeholder
-        candidates: blockchainData.candidate_ids.map((id: string) => ({
-          candidate_id: id,
-          name: `Candidate ${id.substring(0, 5)}`,
-          party: 'Unknown'
-        }))
-      });
-      logger.info(`Created basic election record for ${electionId} (no UI metadata available)`);
-    }
   }
 
   /**
    * Handle election updated event
-   * @param blockchainData The blockchain election data
+   * @param electionData The election data
    */
-  private async handleElectionUpdated(blockchainData: any): Promise<void> {
-    const electionId = blockchainData.electionId;
+  private async handleElectionUpdated(electionData: any): Promise<void> {
+    const electionId = electionData.election_id || electionData.electionId;
+    logger.info(`Election ${electionId} updated on blockchain`);
+  
+  }
+
+  /**
+   * Handle vote cast event
+   * @param voteData The data from the vote_cast event
+   */
+  private async handleVoteCast(voteData: { electionId: string; candidateId: string }): Promise<void> {
+    const { electionId, candidateId } = voteData;
+    logger.info(`Vote cast for candidate ${candidateId} in election ${electionId}`);
     
-  //   // Get existing detailed data
-  //   const existingElection = await electionDataService.getElection(electionId);
-    
-  //   if (existingElection) {
-  //     // Update only blockchain-specific fields
-  //     await electionDataService.saveElection({
-  //       election_id: electionId,
-  //       status: blockchainData.electionStatus,
-  //       last_tally_time: blockchainData.lastTallyTime
-  //     });
-  //     logger.info(`Updated existing election record for ${electionId}`);
-  //   } else {
-  //     // Create basic record with blockchain data if detailed data doesn't exist
-  //     const baseElection = {
-  //       election_id: electionId,
-  //       name: blockchainData.name,
-  //       description: "Updated on blockchain", // Placeholder
-  //       start_time: blockchainData.startTime,
-  //       end_time: blockchainData.endTime,
-  //       status: blockchainData.electionStatus,
-  //       eligible_governorates: blockchainData.eligibleGovernorates || []
-  //     };
-      
-  //     // Add candidates if they exist in the data
-  //     const candidates = blockchainData.candidateIds?.map((id: string) => ({
-  //       candidate_id: id,
-  //       name: `Candidate ${id.substring(0, 5)}`, // Placeholder
-  //       party: 'Unknown' // Placeholder
-  //     })) || [];
-      
-  //     await electionDataService.saveElection({
-  //       ...baseElection,
-  //       candidates
-  //     });
-  //     logger.info(`Created new election record from update for ${electionId}`);
-  //   }
+    // Pre-aggregate votes for the candidate
+
   }
 }
 

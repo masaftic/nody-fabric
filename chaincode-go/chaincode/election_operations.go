@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
 
@@ -55,12 +56,13 @@ func (s *VotingContract) GetAllElections(ctx contractapi.TransactionContextInter
 
 // ElectionInput represents the JSON input for creating a new election
 type ElectionInput struct {
-	ID                   string   `json:"election_id"`
-	Name                 string   `json:"name"`
-	CandidateIds         []string `json:"candidate_ids"`
-	StartTime            string   `json:"start_time"`
-	EndTime              string   `json:"end_time"`
-	EligibleGovernorates []string `json:"eligible_governorates"`
+	ID                   string      `json:"election_id"`
+	Name                 string      `json:"name"`
+	Description          string      `json:"description"`
+	Candidates           []Candidate `json:"candidates"`
+	StartTime            string      `json:"start_time"`
+	EndTime              string      `json:"end_time"`
+	EligibleGovernorates []string    `json:"eligible_governorates"`
 }
 
 // CreateElection creates a new election from JSON input (admin only)
@@ -79,7 +81,7 @@ func (s *VotingContract) CreateElection(ctx contractapi.TransactionContextInterf
 	}
 
 	// Validate required fields
-	if input.ID == "" || input.Name == "" || len(input.CandidateIds) == 0 ||
+	if input.ID == "" || input.Name == "" || len(input.Candidates) == 0 ||
 		input.StartTime == "" || input.EndTime == "" {
 		return fmt.Errorf("missing required fields in election input")
 	}
@@ -93,20 +95,17 @@ func (s *VotingContract) CreateElection(ctx contractapi.TransactionContextInterf
 		return fmt.Errorf("election already exists with ID: %s", input.ID)
 	}
 
-	// Initialize vote tally for each candidate
-	voteTally := make(map[string]int)
-	for _, candidate := range input.CandidateIds {
-		voteTally[candidate] = 0
-	}
-
+	// Create the election directly with all the data from the input
 	election := Election{
 		ElectionID:           input.ID,
 		Name:                 input.Name,
-		CandidateIds:         input.CandidateIds,
+		Description:          input.Description,
+		Candidates:           input.Candidates,
 		StartTime:            input.StartTime,
 		EndTime:              input.EndTime,
 		EligibleGovernorates: input.EligibleGovernorates,
 		Status:               "active",
+		LastTallyTime:        time.Now().Format(time.RFC3339),
 	}
 
 	electionJSON, err = json.Marshal(election)
@@ -143,8 +142,8 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 
 	// Initialize tally with 0 for all candidates
 	tally := make(map[string]int)
-	for _, candidate := range election.CandidateIds {
-		tally[candidate] = 0
+	for _, candidate := range election.Candidates {
+		tally[candidate.CandidateID] = 0
 	}
 
 	// Get all votes using range query with prefix
@@ -170,7 +169,11 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 		// Only count votes for the specified election
 		if vote.ElectionID == electionID {
 			// Validate candidate is valid for this election
-			isValidCandidate := slices.Contains(election.CandidateIds, vote.CandidateID)
+			candidateIDs := make([]string, len(election.Candidates))
+			for i, candidate := range election.Candidates {
+				candidateIDs[i] = candidate.CandidateID
+			}
+			isValidCandidate := slices.Contains(candidateIDs, vote.CandidateID)
 			if !isValidCandidate {
 				return fmt.Errorf("invalid candidate ID found in vote: %s", vote.CandidateID)
 			}
@@ -178,12 +181,24 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 		}
 	}
 
+	// Get the client identity ID
+	clientID, err := extractCN(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get client identity: %v", err)
+	}
+
 	// Create a VoteTally structure to save the results
 	voteTally := VoteTally{
-		ElectionID:  electionID,
-		Tallies:     tally,
-		LastUpdated: time.Now().Format(time.RFC3339),
-		IsFinal:     false,
+		ID:         uuid.NewString(),
+		UserID:     clientID,
+		ElectionID: electionID,
+		Tallies:    tally,
+		CreatedAt:  time.Now().Format(time.RFC3339),
+		IsFinal:    false,
+	}
+
+	if election.Status == "completed" {
+		voteTally.IsFinal = true
 	}
 
 	// Save tally to state
@@ -192,7 +207,7 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 		return fmt.Errorf("failed to marshal vote tally: %v", err)
 	}
 
-	err = ctx.GetStub().PutState("tally_"+electionID, tallyJSON)
+	err = ctx.GetStub().PutState(tallyPrefix+electionID, tallyJSON)
 	if err != nil {
 		return fmt.Errorf("failed to save vote tally: %v", err)
 	}
@@ -200,7 +215,7 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 	// Emit an event with the election ID for the tally computation
 	tallyEventPayload, err := json.Marshal(map[string]string{
 		"electionId": electionID,
-		"timestamp":  voteTally.LastUpdated,
+		"timestamp":  voteTally.CreatedAt,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal tally event payload: %v", err)
@@ -211,16 +226,13 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 		return fmt.Errorf("failed to emit tally_computed event: %v", err)
 	}
 
-	// Also save a reference to the tally in the election
-	election.LastTallyTime = voteTally.LastUpdated
-
 	// Save updated election
 	electionJSON, err := json.Marshal(election)
 	if err != nil {
 		return fmt.Errorf("failed to marshal updated election: %v", err)
 	}
 
-	return ctx.GetStub().PutState(electionPrefix+electionID, electionJSON)
+	return ctx.GetStub().PutState(tallyPrefix+electionID, electionJSON)
 }
 
 // ClearElections removes all elections from the ledger - restricted to admins only

@@ -1,7 +1,7 @@
 import { Contract, Network, checkpointers } from '@hyperledger/fabric-gateway';
 import { logger } from '../logger';
 import { BlockChainRepository } from '../fabric-utils/BlockChainRepository';
-import { Election } from '../models/election.model';
+import { Election, VoteModel } from '../models/election.model';
 
 /**
  * Service to handle Fabric events for logging and real-time updates
@@ -123,7 +123,7 @@ export class FabricEventService {
                 switch (event.eventName) {
                   case 'vote_cast':
                     const voteData = JSON.parse(Buffer.from(event.payload).toString());
-                    logger.info(`Vote cast for election ${voteData.electionId}`);
+                    logger.info(`Vote cast for election ${voteData.ElectionID}`);
                     await this.handleVoteCast(voteData);
                     break;
 
@@ -266,14 +266,28 @@ export class FabricEventService {
 
   /**
    * Handle vote cast event
-   * @param voteData The data from the vote_cast event
+   * @param voteData The entire vote object from the blockchain
    */
-  private async handleVoteCast(voteData: { electionId: string; candidateId: string }): Promise<void> {
-    const { electionId, candidateId } = voteData;
-    logger.info(`Vote cast for candidate ${candidateId} in election ${electionId}`);
+  private async handleVoteCast(voteData: { VoteID: string; VoterID: string; ElectionID: string; CandidateID: string; Receipt: string; CreatedAt: string }): Promise<void> {
+    const { VoteID, VoterID, ElectionID, CandidateID, Receipt, CreatedAt } = voteData;
+    logger.info(`Vote cast for candidate ${CandidateID} in election ${ElectionID}`);
     
-    // Pre-aggregate votes for the candidate
-
+    try {
+      // Save vote record to MongoDB with blockchain-generated receipt
+      // No need to fetch the vote again as we have all the data from the event
+      await VoteModel.create({
+        vote_id: VoteID,
+        voter_id: VoterID,
+        election_id: ElectionID,
+        candidate_id: CandidateID,
+        receipt: Receipt,
+        timestamp: new Date(CreatedAt)
+      });
+      
+      logger.info(`Vote record saved to MongoDB from event with ID ${VoteID}`);
+    } catch (error) {
+      logger.error(`Failed to process vote event: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }
 

@@ -5,7 +5,7 @@ import { logger } from "../logger";
 dotenv.config();
 const MONGODB_URI = process.env.MONGODB_URI;
 
-const connectDb = async (): Promise<boolean> => {
+export const connectDb = async (): Promise<boolean> => {
     try {
         if (!MONGODB_URI) {
             logger.error("MONGODB_URI is undefined. Please set it in your .env file.");

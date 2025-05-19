@@ -1,10 +1,11 @@
-import {Router} from "express";
-import {deleteLedger, voteCast,initLedger} from "../controller/ledger.controller";
+import { Router } from "express";
+import { getWorldState, initLedger } from "../controller/ledger.controller";
 
 
 const router = Router()
 
-router.route('/').get(voteCast).delete(deleteLedger).post(initLedger)
+router.post('/init', initLedger)
+router.get('/state', getWorldState)
 
 export {
     router as ledgerRouter

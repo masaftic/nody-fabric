@@ -10,14 +10,12 @@ import {
 
 const router = Router();
 
+// More specific routes first
+router.get("/", getAllElections);
+router.post("/", createElection);
 // Individual election routes
 router.get("/:electionId", getElection);
 // router.get("/:electionId/analytics", getElectionAnalytics);
-
-// General election routes
-router.get("/", getAllElections);
-router.post("/", createElection);
-router.get("/active", getActiveElections);
 
 export {
     router as electionRouter

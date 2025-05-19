@@ -165,10 +165,12 @@ export class BlockChainRepository {
      * @param electionId The ID of the election
      * @param candidateId The ID of the candidate being voted for
      */
-    async castVote(voteId: string, electionId: string, candidateId: string): Promise<void> {
+    async castVote(voteId: string, electionId: string, candidateId: string): Promise<string> {
         logger.info('Submit Transaction: CastVote, casting vote with ID %s for election %s and candidate %s', voteId, electionId, candidateId);
-        await this.contract.submitTransaction('CastVote', voteId, electionId, candidateId);
-        logger.info('Vote cast successfully with ID %s', voteId);
+        const resultBytes = await this.contract.submitTransaction('CastVote', voteId, electionId, candidateId);
+        const receipt = new TextDecoder().decode(resultBytes); // It is not actually json. Just a string
+        // logger.info('Vote cast successfully with ID %s', voteId);
+        return receipt;
     }
 
     /**

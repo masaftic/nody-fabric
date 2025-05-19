@@ -1,7 +1,7 @@
-import {Request, Response} from "express";
-import {fabricConnection, withFabricConnection} from "../fabric-utils/fabric";
-import {BlockChainRepository} from "../fabric-utils/BlockChainRepository";
-import {StatusCodes} from "http-status-codes";
+import { Request, Response } from "express";
+import { fabricConnection, withFabricConnection } from "../fabric-utils/fabric";
+import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
+import { StatusCodes } from "http-status-codes";
 import { VoteModel } from "../models/election.model";
 import { logger } from "../logger";
 import crypto from 'crypto';
@@ -13,45 +13,24 @@ async function vote(req: Request, res: Response) {
         return;
     }
 
-    withFabricConnection(userId, async (contract) => {
-        const voteId = crypto.randomUUID();
-        const votingController = new BlockChainRepository(contract);
-        try {
+    try {
+        const receipt = await withFabricConnection(userId, async (contract) => {
+            const voteId = crypto.randomUUID();
+            const votingController = new BlockChainRepository(contract);
             // Call the CastVote function on the chaincode
-            await votingController.castVote(voteId, electionId, candidateId);
-            
-            // Save vote record in MongoDB for user-related tracking
-            try {
-                // Generate a receipt
-                const receipt = crypto.createHash('sha256').update(`${voteId}${electionId}${candidateId}`).digest('hex');
-                
-                await VoteModel.create({
-                    vote_id: voteId,
-                    voter_id: userId,
-                    election_id: electionId,
-                    candidate_id: candidateId,
-                    receipt: receipt,
-                    timestamp: new Date()
-                });
-                
-                logger.info(`Vote record saved to MongoDB for user ${userId}`);
-            } catch (dbError) {
-                logger.error(`Failed to save vote record to MongoDB: ${dbError instanceof Error ? dbError.message : String(dbError)}`);
-                // Continue with success response even if MongoDB save fails
-                // since the blockchain transaction was successful
-            }
-            
-            res.status(StatusCodes.OK).json({
-                message: 'Vote cast successfully',
-                voteId
-            });
-        } catch (error) {
-            res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-                message: `Error casting vote: ${error instanceof Error ? error.message : String(error)}`,
-                json: JSON.stringify(error)
-            });
-        }
-    });
+            return await votingController.castVote(voteId, electionId, candidateId);
+        });
+
+        res.status(StatusCodes.OK).json({
+            message: 'Vote cast successfully',
+            receipt
+        });
+    } catch (error) {
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: `Error casting vote: ${error instanceof Error ? error.message : String(error)}`,
+            json: JSON.stringify(error)
+        });
+    }
 }
 
 async function getVote(req: Request, res: Response) {
@@ -62,7 +41,7 @@ async function getVote(req: Request, res: Response) {
         return;
     }
 
-    withFabricConnection(userId, async (contract) => {
+    await withFabricConnection(userId, async (contract) => {
         try {
             const votingController = new BlockChainRepository(contract);
             const result = await votingController.getVote(voteId);
@@ -75,24 +54,24 @@ async function getVote(req: Request, res: Response) {
     });
 }
 
-const getVotes = async (req: Request, res: Response) => {
+async function getVotes(req: Request, res: Response) {
     const { userId } = req.body;
     if (!userId) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
         return;
     }
 
-    withFabricConnection(userId, async (contract) => {
-        try {
+    try {
+        const result = await withFabricConnection(userId, async (contract) => {
             const votingController = new BlockChainRepository(contract);
-            const result = await votingController.getAllVotes();
-            res.status(StatusCodes.OK).json({ message: 'Votes retrieved successfully', result });
-        } catch (error) {
-            res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-                message: `Error retrieving votes: ${error instanceof Error ? error.message : String(error)}`
-            });
-        }
-    });
+            return await votingController.getAllVotes();
+        });
+        res.status(StatusCodes.OK).json({ message: 'Votes retrieved successfully', result });
+    } catch (error) {
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: `Error retrieving votes: ${error instanceof Error ? error.message : String(error)}`
+        });
+    }
 }
 
 async function getUserVotes(req: Request, res: Response) {
@@ -105,9 +84,9 @@ async function getUserVotes(req: Request, res: Response) {
     try {
         // Get user's votes from MongoDB
         const votes = await VoteModel.find({ voter_id: userId });
-        res.status(StatusCodes.OK).json({ 
-            message: 'User votes retrieved successfully', 
-            votes 
+        res.status(StatusCodes.OK).json({
+            message: 'User votes retrieved successfully',
+            votes
         });
     } catch (error) {
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({

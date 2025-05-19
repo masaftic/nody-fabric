@@ -37,6 +37,8 @@ async function getElection(req: Request, res: Response) {
 
 async function getAllElections(req: Request, res: Response<Election[] | { message: string }>) {
     const { userId } = req.body;
+    const { filter } = req.query;
+    
     if (!userId) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
         return;
@@ -46,6 +48,12 @@ async function getAllElections(req: Request, res: Response<Election[] | { messag
         // Get elections directly from the blockchain
         const elections = await withFabricConnection(userId, async (contract) => {
             const votingController = new BlockChainRepository(contract);
+            
+            // If filter=active, get only active elections
+            if (filter === 'active') {
+                return await votingController.getActiveElections();
+            }
+            
             return await votingController.getAllElections();
         });
 

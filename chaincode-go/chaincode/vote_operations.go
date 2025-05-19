@@ -12,60 +12,60 @@ import (
 )
 
 // CastVote allows a voter to cast a vote
-func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, voteID string, electionID string, candidateID string) error {
+func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, voteID string, electionID string, candidateID string) (string, error) {
 	// Check if the election is active
 	electionJSON, err := ctx.GetStub().GetState(electionPrefix + electionID)
 	if err != nil {
-		return fmt.Errorf("failed to read from world state: %v", err)
+		return "", fmt.Errorf("failed to read from world state: %v", err)
 	}
 	if electionJSON == nil {
-		return fmt.Errorf("the election %s does not exist", electionID)
+		return "", fmt.Errorf("the election %s does not exist", electionID)
 	}
 
 	var election Election
 	err = json.Unmarshal(electionJSON, &election)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if election.Status != "active" {
-		return fmt.Errorf("the election %s is not active", electionID)
+		return "", fmt.Errorf("the election %s is not active", electionID)
 	}
 
 	// Get voter ID by extracting CN from client identity
 	voterId, err := extractCN(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get voter ID: %v", err)
+		return "", fmt.Errorf("failed to get voter ID: %v", err)
 	}
 
 	// Retrieve user record
 	userJSON, err := ctx.GetStub().GetState(userPrefix + voterId)
 	if err != nil {
-		return fmt.Errorf("failed to read user from world state: %v", err)
+		return "", fmt.Errorf("failed to read user from world state: %v", err)
 	}
 	if userJSON == nil {
-		return fmt.Errorf("user %s is not registered in the system", voterId)
+		return "", fmt.Errorf("user %s is not registered in the system", voterId)
 	}
 
 	var user User
 	err = json.Unmarshal(userJSON, &user)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Check if user is active
 	if user.Status != "active" {
-		return fmt.Errorf("user account is not active")
+		return "", fmt.Errorf("user account is not active")
 	}
 
 	// Check if user has already voted in this election
 	if slices.Contains(user.VotedElectionIds, electionID) {
-		return fmt.Errorf("user has already voted in this election")
+		return "", fmt.Errorf("user has already voted in this election")
 	}
 
 	// Check if user's governorate is eligible for this election
 	if !slices.Contains(election.EligibleGovernorates, user.Governorate) {
-		return fmt.Errorf("user from %s is not eligible to vote in this election", user.Governorate)
+		return "", fmt.Errorf("user from %s is not eligible to vote in this election", user.Governorate)
 	}
 
 	// Check if candidate is valid for this election
@@ -77,7 +77,7 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 		}
 	}
 	if !isValidCandidate {
-		return fmt.Errorf("invalid candidate ID: %s", candidateID)
+		return "", fmt.Errorf("invalid candidate ID: %s", candidateID)
 	}
 
 	// Create the vote receipt
@@ -94,44 +94,39 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 	}
 	voteJSON, err := json.Marshal(vote)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Update user's voting history
 	user.VotedElectionIds = append(user.VotedElectionIds, electionID)
 	updatedUserJSON, err := json.Marshal(user)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Store both the vote and updated user record
 	err = ctx.GetStub().PutState(votePrefix+voteID, voteJSON)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// Emit a vote_cast event for external observers
-	voteEvent := struct {
-		VoteID      string `json:"vote_id"`
-		ElectionID  string `json:"electionId"`
-		CandidateID string `json:"candidateId"`
-	}{
-		VoteID:      voteID,
-		ElectionID:  electionID,
-		CandidateID: candidateID,
-	}
-
-	eventJSON, err := json.Marshal(voteEvent)
+	// Emit a vote_cast event with the entire vote object
+	// This will eliminate the need to fetch the vote again in the client
+	eventJSON, err := json.Marshal(vote)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = ctx.GetStub().SetEvent("vote_cast", eventJSON)
 	if err != nil {
-		return fmt.Errorf("failed to emit vote_cast event: %v", err)
+		return "", fmt.Errorf("failed to emit vote_cast event: %v", err)
 	}
 
-	return ctx.GetStub().PutState(userPrefix+voterId, updatedUserJSON)
+	err = ctx.GetStub().PutState(userPrefix+voterId, updatedUserJSON)
+	if err != nil {
+		return "", err
+	}
+	return vote.Receipt, nil
 }
 
 // GetVote returns the vote stored in the world state with given voteID
@@ -180,29 +175,29 @@ func (s *VotingContract) GetAllVotes(ctx contractapi.TransactionContextInterface
 }
 
 // ClearVotes removes all votes from the ledger - restricted to admins only
-func (s *VotingContract) ClearVotes(ctx contractapi.TransactionContextInterface) error {
-	// Ensure admin privileges
-	if err := s.ensureAdmin(ctx); err != nil {
-		return err
-	}
+// func (s *VotingContract) ClearVotes(ctx contractapi.TransactionContextInterface) error {
+// 	// Ensure admin privileges
+// 	if err := s.ensureAdmin(ctx); err != nil {
+// 		return err
+// 	}
 
-	iterator, err := ctx.GetStub().GetStateByRange(votePrefix, votePrefix+"}")
-	if err != nil {
-		return fmt.Errorf("failed to get votes: %v", err)
-	}
-	defer iterator.Close()
+// 	iterator, err := ctx.GetStub().GetStateByRange(votePrefix, votePrefix+"}")
+// 	if err != nil {
+// 		return fmt.Errorf("failed to get votes: %v", err)
+// 	}
+// 	defer iterator.Close()
 
-	for iterator.HasNext() {
-		queryResult, err := iterator.Next()
-		if err != nil {
-			return fmt.Errorf("failed to get next vote: %v", err)
-		}
+// 	for iterator.HasNext() {
+// 		queryResult, err := iterator.Next()
+// 		if err != nil {
+// 			return fmt.Errorf("failed to get next vote: %v", err)
+// 		}
 
-		err = ctx.GetStub().DelState(queryResult.Key)
-		if err != nil {
-			return fmt.Errorf("failed to delete vote %s: %v", queryResult.Key, err)
-		}
-	}
+// 		err = ctx.GetStub().DelState(queryResult.Key)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to delete vote %s: %v", queryResult.Key, err)
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

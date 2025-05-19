@@ -4,7 +4,6 @@ import { caURL, fabricCaTlsCertPath, tlsCertPath } from './fabric-utils/config';
 import { IdentityManager } from './fabric-utils/identityManager';
 import { BlockChainRepository } from './fabric-utils/BlockChainRepository';
 import { fabricConnection, fabricAdminConnection } from './fabric-utils/fabric';
-import { mainRouter } from "./routes/main.route";
 import { userRouter } from "./routes/user.route";
 import { votesRouter } from "./routes/votes.route";
 import { electionRouter } from "./routes/election.route";
@@ -41,11 +40,14 @@ export const createServerApp = async () => {
             // Use admin connection to Fabric for event service
             const [gateway, client] = await fabricAdminConnection();
             const network = gateway.getNetwork('mychannel');
+            const contract = network.getContract('basic');
+            const blockChainRepository = new BlockChainRepository(contract);
+            await blockChainRepository.initLedger();
 
             // Initialize and start the event service
-            const eventService = initFabricEventService(network);
-            await eventService.syncInitialData();
-            await eventService.startListening();
+            // const eventService = initFabricEventService(network);
+            // await eventService.syncInitialData();
+            // await eventService.startListening();
 
             logger.info('Fabric event service initialized and started');
 
@@ -72,11 +74,10 @@ export const createServerApp = async () => {
         }
     }
 
-    app.use("/api/test", mainRouter);
-    app.use("/api/users", userRouter);
-    app.use("/api/votes", votesRouter);
-    app.use("/api/elections", electionRouter);
-    app.use("/api/ledger", ledgerRouter);
+    app.use("/api/v1/users", userRouter);
+    app.use("/api/v1/votes", votesRouter);
+    app.use("/api/v1/elections", electionRouter);
+    app.use("/api/v1/ledger", ledgerRouter);
 
     // Add a health check endpoint
     app.get('/health', (req: Request, res: Response) => {

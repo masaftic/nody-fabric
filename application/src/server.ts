@@ -34,7 +34,7 @@ export const createServerApp = async () => {
     if (dbConnected) {
         try {
             // Enroll admin
-            const identityManager = new IdentityManager(caURL, tlsCertPath);
+            const identityManager = new IdentityManager();
             await identityManager.enrollAdmin();
 
             // Use admin connection to Fabric for event service

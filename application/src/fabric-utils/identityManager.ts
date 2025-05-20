@@ -3,6 +3,7 @@ import { IEnrollmentRequest, IRegisterRequest } from 'fabric-ca-client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { User, Utils } from 'fabric-common';
+import { caURL, tlsCertPath } from './config';
 
 class IdentityManagerError extends Error {
     constructor(message: string, public readonly cause?: Error) {
@@ -14,15 +15,17 @@ class IdentityManagerError extends Error {
 export class IdentityManager {
     private ca: FabricCAServices;
     private walletPath: string;
+    private caUrl: string = caURL; 
+    private tlsCert: string = tlsCertPath;
 
-    constructor(caUrl: string, tlsCert?: string) {
+    constructor() {
         try {
             const options: any = {
                 verify: false,
-                trustedRoots: tlsCert ? [tlsCert] : undefined
+                trustedRoots: this.tlsCert ? [this.tlsCert] : undefined
             };
 
-            this.ca = new FabricCAServices(caUrl, options);
+            this.ca = new FabricCAServices(this.caUrl, options);
             this.walletPath = path.join(__dirname, '..', 'wallet');
         } catch (error) {
             throw new IdentityManagerError('Failed to initialize IdentityManager', error as Error);

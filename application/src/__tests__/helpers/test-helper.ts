@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { IdentityManager } from '../../fabric-utils/identityManager';
-import { caURL, fabricCaTlsCertPath } from '../../fabric-utils/config';
 import UserModel from '../../models/user.model';
 import { withFabricAdminConnection } from '../../fabric-utils/fabric';
 import { BlockChainRepository } from '../../fabric-utils/BlockChainRepository';
@@ -19,7 +18,7 @@ export class TestHelper {
     const nationalId = `30301231230123`;
     const phone = '01234567891';
 
-    const identityManager = new IdentityManager(caURL, fabricCaTlsCertPath);
+    const identityManager = new IdentityManager();
     
     try {
       // Register and enroll user in Fabric CA

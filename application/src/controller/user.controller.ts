@@ -19,7 +19,7 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
         return;
     }
 
-    const identityManager = new IdentityManager(caURL, fabricCaTlsCertPath);
+    const identityManager = new IdentityManager();
     const userId = crypto.randomUUID(); // voterId
 
     try {

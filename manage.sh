@@ -11,6 +11,13 @@ function build() {
 
     # Deploy the chaincode
     ./network.sh deployCC -ccn basic -ccp ../../chaincode-go -ccl go
+
+    cd ../../application
+    ./mongo.sh start
+    npm install
+    npm run build
+    
+    cd ../
 }
 
 function clean() {
@@ -26,6 +33,10 @@ function clean() {
     # Remove old credentials and build artifacts
     rm -rf wallet/
     rm -rf dist/
+
+    ./mongo.sh clean
+
+    cd ../
 }
 
 function deploy() {

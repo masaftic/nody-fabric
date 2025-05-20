@@ -44,6 +44,11 @@ function upgrade() {
     ./network.sh deployCC -ccn basic -ccp ../../chaincode-go -ccl go -ccv 2.0
 }
 
+function restart() {
+    clean
+    build
+}
+
 if [ "$1" == "build" ]; then
     build
 elif [ "$1" == "clean" ]; then
@@ -52,7 +57,9 @@ elif [ "$1" == "deploy" ]; then
     deploy
 elif [ "$1" == "upgrade" ]; then
     upgrade
+elif [ "$1" == "restart" ]; then
+    restart
 else
-    echo "Usage: $0 {build|clean|deploy|upgrade}"
+    echo "Usage: $0 {build|clean|deploy|upgrade|restart}"
     exit 1
 fi

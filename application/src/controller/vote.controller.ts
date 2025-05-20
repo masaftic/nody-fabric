@@ -16,9 +16,9 @@ async function vote(req: Request, res: Response) {
     try {
         const receipt = await withFabricConnection(userId, async (contract) => {
             const voteId = crypto.randomUUID();
-            const votingController = new BlockChainRepository(contract);
+            const blockchainRepo = new BlockChainRepository(contract);
             // Call the CastVote function on the chaincode
-            return await votingController.castVote(voteId, electionId, candidateId);
+            return await blockchainRepo.castVote(voteId, electionId, candidateId);
         });
 
         res.status(StatusCodes.OK).json({
@@ -43,8 +43,8 @@ async function getVote(req: Request, res: Response) {
 
     await withFabricConnection(userId, async (contract) => {
         try {
-            const votingController = new BlockChainRepository(contract);
-            const result = await votingController.getVote(voteId);
+            const blockchainRepo = new BlockChainRepository(contract);
+            const result = await blockchainRepo.getVote(voteId);
             res.status(StatusCodes.OK).json({ message: 'Vote retrieved successfully', result });
         } catch (error) {
             res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
@@ -63,8 +63,8 @@ async function getVotes(req: Request, res: Response) {
 
     try {
         const result = await withFabricConnection(userId, async (contract) => {
-            const votingController = new BlockChainRepository(contract);
-            return await votingController.getAllVotes();
+            const blockchainRepo = new BlockChainRepository(contract);
+            return await blockchainRepo.getAllVotes();
         });
         res.status(StatusCodes.OK).json({ message: 'Votes retrieved successfully', result });
     } catch (error) {

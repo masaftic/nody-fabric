@@ -18,22 +18,3 @@ async function main() {
 
 main().catch(console.error);
 
-
-// type User = Prettify<UserBlockChain & UserMetaData>;
-interface User extends UserMetaData, UserBlockChain {}
-
-interface UserBlockChain {
-    id: string;
-    name: string;
-}
-
-interface UserMetaData {
-    id: string;
-    profile: string;
-    reviews: string[];
-}
-
-
-type Prettify<T> = {
-    [K in keyof T]: T[K];
-} & {};

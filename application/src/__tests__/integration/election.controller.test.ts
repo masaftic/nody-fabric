@@ -153,8 +153,8 @@ describe('Election Controller Integration Tests', () => {
 
       // Get the election directly from the blockchain
       const election = await withFabricConnection(testUser.userId, async (contract) => {
-        const votingController = new BlockChainRepository(contract);
-        return await votingController.getElection(createdElectionId);
+        const blockchainRepo = new BlockChainRepository(contract);
+        return await blockchainRepo.getElection(createdElectionId);
       });
 
       expect(election).toHaveProperty('election_id', createdElectionId);

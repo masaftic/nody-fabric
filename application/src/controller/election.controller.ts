@@ -22,8 +22,8 @@ async function getElection(req: Request, res: Response) {
 
     try {
         const election = await withFabricConnection(userId, async (contract) => {
-            const votingController = new BlockChainRepository(contract);
-            return await votingController.getElection(electionId);
+            const blockchainRepo = new BlockChainRepository(contract);
+            return await blockchainRepo.getElection(electionId);
         });
 
         res.status(StatusCodes.OK).json(election as GetElectionResponse);
@@ -47,14 +47,14 @@ async function getAllElections(req: Request, res: Response<Election[] | { messag
     try {
         // Get elections directly from the blockchain
         const elections = await withFabricConnection(userId, async (contract) => {
-            const votingController = new BlockChainRepository(contract);
+            const blockchainRepo = new BlockChainRepository(contract);
             
             // If filter=active, get only active elections
             if (filter === 'active') {
-                return await votingController.getActiveElections();
+                return await blockchainRepo.getActiveElections();
             }
             
-            return await votingController.getAllElections();
+            return await blockchainRepo.getAllElections();
         });
 
         res.status(StatusCodes.OK).json(elections);
@@ -83,8 +83,8 @@ async function createElection(req: Request<{}, {}, CreateElectionRequest>, res: 
     try {
         // Create the election directly with all information
         const electionId = await withFabricConnection(userId, async (contract) => {
-            const votingController = new BlockChainRepository(contract);
-            return await votingController.createElection({
+            const blockchainRepo = new BlockChainRepository(contract);
+            return await blockchainRepo.createElection({
                 name,
                 description,
                 candidates,
@@ -121,8 +121,8 @@ async function getActiveElections(req: Request, res: Response) {
     try {
         // Fetch active elections directly from the blockchain
         const activeElections = await withFabricConnection(userId, async (contract) => {
-            const votingController = new BlockChainRepository(contract);
-            return await votingController.getActiveElections();
+            const blockchainRepo = new BlockChainRepository(contract);
+            return await blockchainRepo.getActiveElections();
         });
 
         res.status(StatusCodes.OK).json(activeElections);

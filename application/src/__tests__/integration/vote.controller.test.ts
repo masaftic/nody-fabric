@@ -34,8 +34,8 @@ describe('Vote Controller Integration Tests', () => {
     
     // Get the candidate ID from the election
     const electionDetails = await withFabricConnection(testUser.userId, async (contract) => {
-      const votingController = new BlockChainRepository(contract);
-      return await votingController.getElection(electionId);
+      const blockchainRepo = new BlockChainRepository(contract);
+      return await blockchainRepo.getElection(electionId);
     });
     
     candidateId = electionDetails.candidates[0].candidate_id;

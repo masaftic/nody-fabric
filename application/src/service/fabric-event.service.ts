@@ -199,18 +199,18 @@ export class FabricEventService {
       eligible_governorates: ['Governorate A', 'Governorate B'],
     };
     
-    const votingController = new BlockChainRepository(this.contract);
-    await votingController.createElection(sampleElection);
+    const blockchainRepo = new BlockChainRepository(this.contract);
+    await blockchainRepo.createElection(sampleElection);
   }
   
   /**
    * Verify blockchain elections integrity
    */
   private async verifyBlockchainElections(): Promise<void> {
-    const votingController = new BlockChainRepository(this.contract);
+    const blockchainRepo = new BlockChainRepository(this.contract);
     
     // Get all elections
-    let elections = await votingController.getAllElections();
+    let elections = await blockchainRepo.getAllElections();
     
     if (elections.length === 0) {
       logger.info('No elections found on the blockchain');
@@ -220,7 +220,7 @@ export class FabricEventService {
     // Verify elections and compute tallies if needed
     for (const election of elections) {
       // Compute the current tally for the election (optional, can be commented out)
-      await votingController.computeVoteTally(election.election_id);
+      await blockchainRepo.computeVoteTally(election.election_id);
     }
     
     logger.info(`Verified ${elections.length} elections on the blockchain`);

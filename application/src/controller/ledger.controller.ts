@@ -10,8 +10,8 @@ async function initLedger(req: Request, res: Response) {
     }
 
     await withFabricAdminConnection((contract) => {
-        const votingController = new BlockChainRepository(contract);
-        return votingController.initLedger();
+        const blockchainRepo = new BlockChainRepository(contract);
+        return blockchainRepo.initLedger();
     });
 
     res.status(StatusCodes.CREATED).json({ message: 'ledger initialized successfully' });
@@ -24,8 +24,8 @@ async function getWorldState(req: Request, res: Response) {
     }
 
     const result = await withFabricAdminConnection((contract) => {
-        const votingController = new BlockChainRepository(contract);
-        return votingController.getWorldState();
+        const blockchainRepo = new BlockChainRepository(contract);
+        return blockchainRepo.getWorldState();
     });
 
     res.status(StatusCodes.OK).json(result);
@@ -39,8 +39,8 @@ async function getWorldState(req: Request, res: Response) {
 //     }
 
 //     await withFabricAdminConnection((contract) => {
-//         const votingController = new BlockChainRepository(contract);
-//         return votingController.deleteWorldState();
+//         const blockchainRepo = new BlockChainRepository(contract);
+//         return blockchainRepo.deleteWorldState();
 //     });
 
 //     res.status(StatusCodes.OK).json({ message: 'Ledger cleared successfully' });

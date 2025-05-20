@@ -42,8 +42,8 @@ export class TestHelper {
 
       // Register user in blockchain
       await withFabricAdminConnection(async (contract) => {
-        const votingController = new BlockChainRepository(contract);
-        await votingController.registerUser(userId, governorate);
+        const blockchainRepo = new BlockChainRepository(contract);
+        await blockchainRepo.registerUser(userId, governorate);
       });
 
       return { userId, nationalId, phone, governorate };

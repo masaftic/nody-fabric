@@ -42,8 +42,8 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
         await userService.saveUser(userData);
 
         await withFabricAdminConnection(async (contract) => {
-            const votingController = new BlockChainRepository(contract);
-            await votingController.registerUser(userId, req.body.governorate);
+            const blockchainRepo = new BlockChainRepository(contract);
+            await blockchainRepo.registerUser(userId, req.body.governorate);
         });
 
         res.status(StatusCodes.CREATED).json({

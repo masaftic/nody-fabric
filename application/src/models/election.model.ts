@@ -57,7 +57,7 @@ export interface Vote {
   election_id: string;
   candidate_id: string;
   receipt: string;
-  timestamp: Date;
+  created_at: Date;
 }
 
 export interface VoteResponse {
@@ -66,11 +66,20 @@ export interface VoteResponse {
   vote_id: string;
 }
 
+// Updated VoteTally interface for real-time vote tracking
 export interface VoteTally {
+  election_id: string;
+  tallies: Map<string, number>;
+  total_votes: number;
+  last_updated: Date;
+}
+
+// Original blockchain VoteTally (renamed to avoid conflicts)
+export interface BlockchainVoteTally {
   id: string;
   user_id: string;
   election_id: string;
-  tallies: Record<string, number>;
+  tallies: Map<string, number>;
   created_at: Date;
   is_final: boolean;
 }
@@ -84,7 +93,7 @@ const VoteSchema = new Schema({
   receipt: { type: String, required: true },
   timestamp: { type: Date, default: Date.now },
   created_at: { type: Date, default: Date.now }
-}, { timestamps: { createdAt: 'created_at' } });
+});
 
 // Create indexes for better query performance
 VoteSchema.index({ election_id: 1, candidate_id: 1 });
@@ -92,3 +101,17 @@ VoteSchema.index({ voter_id: 1 });
 
 // Only keep the Vote model for MongoDB
 export const VoteModel = mongoose.model<VoteDocument>('Vote', VoteSchema);
+
+// Schema for vote tallies
+const VoteTallySchema = new Schema({
+  election_id: { type: String, required: true, unique: true },
+  tallies: { type: Map, of: Number, default: {} },
+  total_votes: { type: Number, default: 0 },
+  last_updated: { type: Date, default: Date.now }
+});
+
+// Create indexes for better query performance
+VoteTallySchema.index({ election_id: 1 });
+
+// Vote tally model for MongoDB
+export const VoteTallyModel = mongoose.model<Document & VoteTally>('VoteTally', VoteTallySchema);

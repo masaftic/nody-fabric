@@ -1,20 +1,20 @@
-import {Router} from "express";
+import { Router } from "express";
 import {
-    getElection, 
-    getAllElections, 
+    getElection,
+    getAllElections,
     // getElectionAnalytics, 
-    createElection, 
-    getActiveElections
+    createElection,
 } from "../controller/election.controller";
+
+import { authenticate, authorize } from "../middleware/auth.middleware";
 
 
 const router = Router();
 
-// More specific routes first
-router.get("/", getAllElections);
-router.post("/", createElection);
-// Individual election routes
-router.get("/:electionId", getElection);
+router.get("/", authenticate, getAllElections);
+router.get("/:electionId", authenticate, getElection);
+
+router.post("/", authenticate, authorize(['admin']), createElection);
 // router.get("/:electionId/analytics", getElectionAnalytics);
 
 export {

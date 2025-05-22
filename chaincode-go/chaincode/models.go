@@ -10,7 +10,7 @@ const (
 
 // Vote represents a vote cast by a voter
 type Vote struct {
-	VoteID      string `json:"id"`
+	VoteID      string `json:"vote_id"`
 	VoterID     string `json:"voter_id"`
 	ElectionID  string `json:"election_id"`
 	CandidateID string `json:"candidate_id"`

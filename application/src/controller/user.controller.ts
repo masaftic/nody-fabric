@@ -9,6 +9,8 @@ import { userService } from '../service/user.service';
 import UserModel, { UserRegisterRequest } from '../models/user.model';
 import { fabricAdminConnection, fabricConnection, withFabricAdminConnection } from "../fabric-utils/fabric";
 import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
+import { generateToken } from '../utils/jwt.utils';
+import crypto from 'crypto';
 
 
 async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response) {
@@ -46,9 +48,16 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             await blockchainRepo.registerUser(userId, req.body.governorate);
         });
 
+        // Generate JWT token
+        const token = generateToken({
+            userId,
+            role: 'voter'
+        });
+
         res.status(StatusCodes.CREATED).json({
             message: 'User registered successfully',
             userId,
+            token,
             certificate: userEnrollment.certificate,
             key: userEnrollment.key.toBytes(),
         });
@@ -116,6 +125,44 @@ const verifyOtp = async (req: Request, res: Response) => {
         message: twilioResponse.message
     })
 }
+
+
+export async function login(req: Request, res: Response) {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber || !verifyPhoneNumber(phoneNumber))
+        throw new BadRequestError("InValid Phone Number");
+
+    // Since phone numbers are hashed in the database, we need to check each user
+    const users = await UserModel.find({});
+    let matchedUser = null;
+
+    // Find the user whose hashed phone matches the provided phone
+    for (const user of users) {
+        const isMatch = await user.comparePhoneNumber(phoneNumber);
+        if (isMatch) {
+            matchedUser = user;
+            break;
+        }
+    }
+
+    if (!matchedUser) {
+        res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+        return;
+    }
+
+    // Generate JWT token
+    const token = generateToken({
+        userId: matchedUser.userId,
+        role: matchedUser.role
+    });
+
+    res.status(StatusCodes.OK).json({
+        message: 'User logged in successfully',
+        token,
+        governorate: matchedUser.governorate
+    });
+}
+
 export {
     register as userRegister, sendOtp as sendSmsOtp,
     resendOtp as resendSmsOtp, verifyOtp as verifySmsOtp

@@ -16,7 +16,8 @@
                 "${workspaceFolder}/**/*.js"
             ],
             "cwd": "${workspaceFolder}/application",
-            "envFile": "${workspaceFolder}/application/.env"
+            "envFile": "${workspaceFolder}/application/.env",
+            "console": "integratedTerminal",
         }
     ]
 }

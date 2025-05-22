@@ -40,14 +40,11 @@ export const createServerApp = async () => {
             // Use admin connection to Fabric for event service
             const [gateway, client] = await fabricAdminConnection();
             const network = gateway.getNetwork('mychannel');
-            const contract = network.getContract('basic');
-            const blockChainRepository = new BlockChainRepository(contract);
-            await blockChainRepository.initLedger();
 
             // Initialize and start the event service
-            // const eventService = initFabricEventService(network);
-            // await eventService.syncInitialData();
-            // await eventService.startListening();
+            const eventService = initFabricEventService(network);
+            await eventService.syncInitialData();
+            await eventService.startListening();
 
             logger.info('Fabric event service initialized and started');
 

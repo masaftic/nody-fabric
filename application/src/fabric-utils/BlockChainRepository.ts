@@ -130,7 +130,7 @@ export class BlockChainRepository {
         const blockchainInputJSON = JSON.stringify(election);
         await this.contract.submitTransaction('CreateElection', blockchainInputJSON);
 
-        logger.info('Transaction committed successfully: election created with ID %s', electionId);
+        logger.info('Transaction committed successfully: election created with ID %s and sample candidate ID %s', electionId, candidatesWithIds[0].candidate_id);
         return electionId;
     }
 

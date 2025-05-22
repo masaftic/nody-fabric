@@ -1,7 +1,7 @@
 import { Contract, Network, checkpointers } from '@hyperledger/fabric-gateway';
 import { logger } from '../logger';
 import { BlockChainRepository } from '../fabric-utils/BlockChainRepository';
-import { Election, VoteModel } from '../models/election.model';
+import { Election, Vote, VoteModel, VoteTallyModel } from '../models/election.model';
 
 /**
  * Service to handle Fabric events for logging and real-time updates
@@ -122,8 +122,8 @@ export class FabricEventService {
                 // Process different event types based on the event name
                 switch (event.eventName) {
                   case 'vote_cast':
-                    const voteData = JSON.parse(Buffer.from(event.payload).toString());
-                    logger.info(`Vote cast for election ${voteData.ElectionID}`);
+                    const voteData: Vote = JSON.parse(Buffer.from(event.payload).toString());
+                    logger.info(`Vote cast for election ${voteData.election_id}`);
                     await this.handleVoteCast(voteData);
                     break;
 
@@ -173,7 +173,7 @@ export class FabricEventService {
    */
   private async createSampleElection(): Promise<void> {
     logger.info('Creating sample test election');
-    
+
     const sampleElection = {
       name: 'Initial Election',
       description: 'Sample test election created automatically',
@@ -196,22 +196,22 @@ export class FabricEventService {
       ],
       start_time: new Date().toISOString(),
       end_time: new Date(Date.now() + 86400000).toISOString(), // 1 day later
-      eligible_governorates: ['Governorate A', 'Governorate B'],
+      eligible_governorates: ['Governorate1', 'Governorate B'],
     };
-    
+
     const blockchainRepo = new BlockChainRepository(this.contract);
     await blockchainRepo.createElection(sampleElection);
   }
-  
+
   /**
    * Verify blockchain elections integrity
    */
   private async verifyBlockchainElections(): Promise<void> {
     const blockchainRepo = new BlockChainRepository(this.contract);
-    
+
     // Get all elections
     let elections = await blockchainRepo.getAllElections();
-    
+
     if (elections.length === 0) {
       logger.info('No elections found on the blockchain');
       return;
@@ -222,7 +222,7 @@ export class FabricEventService {
       // Compute the current tally for the election (optional, can be commented out)
       await blockchainRepo.computeVoteTally(election.election_id);
     }
-    
+
     logger.info(`Verified ${elections.length} elections on the blockchain`);
   }
 
@@ -232,7 +232,7 @@ export class FabricEventService {
   async syncInitialData(): Promise<void> {
     try {
       logger.info('Verifying blockchain data integrity');
-      
+
       await this.createSampleElection();
       // await this.verifyBlockchainElections();
 
@@ -251,7 +251,7 @@ export class FabricEventService {
   private async handleElectionCreated(electionData: Election): Promise<void> {
     const electionId = electionData.election_id;
     logger.info(`Election ${electionId} created on blockchain: "${electionData.name}"`);
-    
+
   }
 
   /**
@@ -261,32 +261,80 @@ export class FabricEventService {
   private async handleElectionUpdated(electionData: any): Promise<void> {
     const electionId = electionData.election_id || electionData.electionId;
     logger.info(`Election ${electionId} updated on blockchain`);
-  
+
   }
 
   /**
    * Handle vote cast event
    * @param voteData The entire vote object from the blockchain
    */
-  private async handleVoteCast(voteData: { VoteID: string; VoterID: string; ElectionID: string; CandidateID: string; Receipt: string; CreatedAt: string }): Promise<void> {
-    const { VoteID, VoterID, ElectionID, CandidateID, Receipt, CreatedAt } = voteData;
-    logger.info(`Vote cast for candidate ${CandidateID} in election ${ElectionID}`);
-    
+  private async handleVoteCast(voteData: Vote): Promise<void> {
+    logger.info(`Vote cast for candidate ${voteData.candidate_id} in election ${voteData.election_id}`);
+
     try {
       // Save vote record to MongoDB with blockchain-generated receipt
       // No need to fetch the vote again as we have all the data from the event
-      await VoteModel.create({
-        vote_id: VoteID,
-        voter_id: VoterID,
-        election_id: ElectionID,
-        candidate_id: CandidateID,
-        receipt: Receipt,
-        timestamp: new Date(CreatedAt)
-      });
-      
-      logger.info(`Vote record saved to MongoDB from event with ID ${VoteID}`);
+      await VoteModel.create(voteData);
+
+      // Update the vote tally in real-time
+      await this.updateVoteTally(voteData.election_id, voteData.candidate_id);
+
+      logger.info(`Vote record saved to MongoDB from event with ID ${voteData.vote_id}`);
     } catch (error) {
       logger.error(`Failed to process vote event: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Update vote tally for a specific election and candidate
+   * @param electionId The election ID
+   * @param candidateId The candidate ID
+   */
+  private async updateVoteTally(electionId: string, candidateId: string): Promise<void> {
+    try {
+      // Attempt atomic update assuming the tally already exists
+      const updateResult = await VoteTallyModel.updateOne(
+        { election_id: electionId },
+        {
+          $inc: {
+            [`tallies.${candidateId}`]: 1,
+            total_votes: 1
+          },
+          $set: {
+            last_updated: new Date()
+          }
+        }
+      );
+
+      // If no documents matched (tally doesn't exist), create a new one
+      if (updateResult.matchedCount === 0) {
+        const blockchainRepo = new BlockChainRepository(this.contract);
+        const election = await blockchainRepo.getElection(electionId);
+
+        const initialTallies: Record<string, number> = {};
+        for (const candidate of election.candidates) {
+          initialTallies[candidate.candidate_id] = 0;
+        }
+
+        // Increment the voted candidate
+        if (initialTallies[candidateId] === undefined) {
+          // Defensive check in case candidate is not in election
+          throw new Error(`Candidate ${candidateId} not found in election ${electionId}`);
+        }
+
+        initialTallies[candidateId] = 1;
+
+        await VoteTallyModel.create({
+          election_id: electionId,
+          tallies: initialTallies,
+          total_votes: 1,
+          last_updated: new Date()
+        });
+      }
+
+      logger.debug(`Vote tallied for election ${electionId}, candidate ${candidateId}`);
+    } catch (error) {
+      logger.error(`Failed to update vote tally: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { fabricConnection, withFabricConnection } from "../fabric-utils/fabric";
 import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
 import { StatusCodes } from "http-status-codes";
@@ -12,15 +12,17 @@ import {
 } from "../models/election.model";
 import { logger } from "../logger";
 
-async function getElection(req: Request, res: Response) {
-    const { userId } = req.body;
-    const { electionId } = req.params;
-    if (!userId || !electionId) {
-        res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
-        return;
-    }
-
+export async function getElection(req: Request, res: Response) {
     try {
+        // Get userId from JWT token instead of request body
+        const userId = req.user?.userId;
+        const { electionId } = req.params;
+        
+        if (!userId || !electionId) {
+            res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
+            return;
+        }
+
         const election = await withFabricConnection(userId, async (contract) => {
             const blockchainRepo = new BlockChainRepository(contract);
             return await blockchainRepo.getElection(electionId);
@@ -35,8 +37,9 @@ async function getElection(req: Request, res: Response) {
     }
 }
 
-async function getAllElections(req: Request, res: Response<Election[] | { message: string }>) {
-    const { userId } = req.body;
+export async function getAllElections(req: Request, res: Response<Election[] | { message: string }>) {
+    // Get userId from JWT token instead of request body
+    const userId = req.user?.userId;
     const { filter } = req.query;
     
     if (!userId) {
@@ -66,8 +69,9 @@ async function getAllElections(req: Request, res: Response<Election[] | { messag
     }
 }
 
-async function createElection(req: Request<{}, {}, CreateElectionRequest>, res: Response<CreateElectionResponse>) {
-    const { userId } = req.body as any; // TypeScript workaround for additional userId field
+export async function createElection(req: Request<{}, {}, CreateElectionRequest>, res: Response<CreateElectionResponse>) {
+    // Get userId from JWT token instead of request body
+    const userId = req.user?.userId;
     const { name, description, candidates, start_time, end_time, eligible_governorates } = req.body;
 
     // Validate required fields
@@ -101,6 +105,7 @@ async function createElection(req: Request<{}, {}, CreateElectionRequest>, res: 
         };
 
         res.status(StatusCodes.CREATED).json(response);
+        return;
     } catch (error) {
         logger.error(`Error creating election: ${error instanceof Error ? error.message : String(error)}`);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
@@ -111,32 +116,3 @@ async function createElection(req: Request<{}, {}, CreateElectionRequest>, res: 
     }
 }
 
-async function getActiveElections(req: Request, res: Response) {
-    const { userId } = req.body;
-    if (!userId) {
-        res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
-        return;
-    }
-
-    try {
-        // Fetch active elections directly from the blockchain
-        const activeElections = await withFabricConnection(userId, async (contract) => {
-            const blockchainRepo = new BlockChainRepository(contract);
-            return await blockchainRepo.getActiveElections();
-        });
-
-        res.status(StatusCodes.OK).json(activeElections);
-    } catch (error) {
-        logger.error(`Error retrieving active elections: ${error instanceof Error ? error.message : String(error)}`);
-        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-            message: `Error retrieving active elections: ${error instanceof Error ? error.message : String(error)}`
-        });
-    }
-}
-
-export {
-    getElection,
-    getAllElections,
-    createElection,
-    getActiveElections
-}

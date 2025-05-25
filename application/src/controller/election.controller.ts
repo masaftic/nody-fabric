@@ -37,10 +37,10 @@ export async function getElection(req: Request, res: Response) {
     }
 }
 
-export async function getAllElections(req: Request, res: Response<Election[] | { message: string }>) {
+export async function getAllElections(req: Request, res: Response<GetAllElectionsResponse | { message: string }>) {
     // Get userId from JWT token instead of request body
     const userId = req.user?.userId;
-    const { filter } = req.query;
+    const { status, governorate } = req.query;
     
     if (!userId) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
@@ -52,12 +52,29 @@ export async function getAllElections(req: Request, res: Response<Election[] | {
         const elections = await withFabricConnection(userId, async (contract) => {
             const blockchainRepo = new BlockChainRepository(contract);
             
-            // If filter=active, get only active elections
-            if (filter === 'active') {
+            // If status=active, get only active elections
+            if (status === 'active') {
                 return await blockchainRepo.getActiveElections();
             }
             
-            return await blockchainRepo.getAllElections();
+            // Get all elections first
+            let allElections = await blockchainRepo.getAllElections();
+            
+            // Filter by governorate if specified
+            if (governorate) {
+                allElections = allElections.filter(election => 
+                    election.eligible_governorates.includes(governorate as string)
+                );
+            }
+            
+            // Filter by status if specified (other than 'active' which is handled above)
+            if (status && status !== 'active') {
+                allElections = allElections.filter(election => 
+                    election.status.toLowerCase() === status.toString().toLowerCase()
+                );
+            }
+            
+            return allElections;
         });
 
         res.status(StatusCodes.OK).json(elections);
@@ -72,7 +89,7 @@ export async function getAllElections(req: Request, res: Response<Election[] | {
 export async function createElection(req: Request<{}, {}, CreateElectionRequest>, res: Response<CreateElectionResponse>) {
     // Get userId from JWT token instead of request body
     const userId = req.user?.userId;
-    const { name, description, candidates, start_time, end_time, eligible_governorates } = req.body;
+    const { name, description, candidates, start_time, end_time, eligible_governorates, election_image } = req.body;
 
     // Validate required fields
     if (!userId || !name || !description || !candidates || !start_time || !end_time || !eligible_governorates) {
@@ -94,9 +111,10 @@ export async function createElection(req: Request<{}, {}, CreateElectionRequest>
                 candidates,
                 start_time,
                 end_time,
-                eligible_governorates
+                eligible_governorates,
+                election_image
             });
-        }, true);
+        }, false);
 
         const response: CreateElectionResponse = {
             status: "success",

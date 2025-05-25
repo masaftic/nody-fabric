@@ -29,6 +29,7 @@ type Election struct {
 	EligibleGovernorates []string    `json:"eligible_governorates"`
 	Status               string      `json:"status"`
 	LastTallyTime        string      `json:"last_tally_time,omitempty"`
+	ElectionImage        string      `json:"election_image"`
 }
 
 // Candidate represents a candidate in an election
@@ -37,6 +38,7 @@ type Candidate struct {
 	Name         string `json:"name"`
 	Party        string `json:"party"`
 	ProfileImage string `json:"profile_image"`
+	Description  string `json:"description"`
 }
 
 // User represents a registered voter in the system

@@ -128,6 +128,9 @@ const verifyOtp = async (req: Request, res: Response) => {
 
 
 export async function login(req: Request, res: Response) {
+    // Temporarily using phone number for login.
+    // Instead of a sign challenge with the private key of the user.
+
     const { phoneNumber } = req.body;
     if (!phoneNumber || !verifyPhoneNumber(phoneNumber))
         throw new BadRequestError("InValid Phone Number");

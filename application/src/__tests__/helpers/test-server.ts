@@ -1,7 +1,7 @@
 import express, { Express } from 'express';
 import { userRouter } from '../../routes/user.route';
 import { votesRouter } from '../../routes/votes.route';
-import { electionRouter } from '../../routes/election.route';
+import { electionRouter } from '../../routes/elections.route';
 import { ledgerRouter } from '../../routes/ledger.route';
 
 /**

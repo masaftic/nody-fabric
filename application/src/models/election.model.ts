@@ -8,7 +8,8 @@ export interface Candidate {
   candidate_id: string;
   name: string;
   party: string;
-  profile_image?: string;
+  profile_image: string;
+  description: string;
 }
 
 // Election model - single model for both blockchain and API
@@ -21,6 +22,7 @@ export interface Election {
   end_time: string;
   status: ElectionStatus;
   eligible_governorates: string[];
+  election_image: string; // URL to election image
   last_tally_time?: string;
 }
 
@@ -32,6 +34,7 @@ export interface CreateElectionRequest {
   start_time: string;
   end_time: string;
   eligible_governorates: string[];
+  election_image: string; // URL
 }
 
 export interface CreateElectionResponse {
@@ -42,9 +45,7 @@ export interface CreateElectionResponse {
 
 export type GetElectionResponse = Election;
 
-export interface GetAllElectionsResponse {
-  elections: Election[];
-}
+export type GetAllElectionsResponse = Election[];
 
 // We only keep user-related data and vote tracking in MongoDB
 export interface VoteDocument extends Document, Vote {

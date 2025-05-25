@@ -63,6 +63,7 @@ type ElectionInput struct {
 	StartTime            string      `json:"start_time"`
 	EndTime              string      `json:"end_time"`
 	EligibleGovernorates []string    `json:"eligible_governorates"`
+	ElectionImage        string      `json:"election_image,omitempty"`
 }
 
 // CreateElection creates a new election from JSON input (admin only)
@@ -106,6 +107,7 @@ func (s *VotingContract) CreateElection(ctx contractapi.TransactionContextInterf
 		EligibleGovernorates: input.EligibleGovernorates,
 		Status:               "active",
 		LastTallyTime:        time.Now().Format(time.RFC3339),
+		ElectionImage:        input.ElectionImage,
 	}
 
 	electionJSON, err = json.Marshal(election)

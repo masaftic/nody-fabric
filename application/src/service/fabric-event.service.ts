@@ -1,7 +1,7 @@
 import { Contract, Network, checkpointers } from '@hyperledger/fabric-gateway';
 import { logger } from '../logger';
 import { BlockChainRepository } from '../fabric-utils/BlockChainRepository';
-import { Election, Vote, VoteModel, VoteTallyModel } from '../models/election.model';
+import { CreateElectionRequest, Election, Vote, VoteModel, VoteTallyModel } from '../models/election.model';
 
 /**
  * Service to handle Fabric events for logging and real-time updates
@@ -174,29 +174,33 @@ export class FabricEventService {
   private async createSampleElection(): Promise<void> {
     logger.info('Creating sample test election');
 
-    const sampleElection = {
+    const sampleElection: CreateElectionRequest = {
       name: 'Initial Election',
       description: 'Sample test election created automatically',
       candidates: [
         {
           name: 'Candidate 1',
           party: 'Party A',
-          profile_image: 'image1.png'
+          profile_image: 'image1.png',
+          description: 'Candidate 1 description'
         },
         {
           name: 'Candidate 2',
           party: 'Party B',
-          profile_image: 'image2.png'
+          profile_image: 'image2.png',
+          description: 'Candidate 2 description'
         },
         {
           name: 'Candidate 3',
           party: 'Independent',
-          profile_image: 'image3.png'
+          profile_image: 'image3.png',
+          description: 'Candidate 3 description'
         }
       ],
       start_time: new Date().toISOString(),
       end_time: new Date(Date.now() + 86400000).toISOString(), // 1 day later
       eligible_governorates: ['Governorate1', 'Governorate B'],
+      election_image: 'election_image.png' // URL to election image
     };
 
     const blockchainRepo = new BlockChainRepository(this.contract);

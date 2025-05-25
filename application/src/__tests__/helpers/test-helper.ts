@@ -76,12 +76,13 @@ export class TestHelper {
       name: `Test Election ${Date.now()}`,
       description: 'Test election created for integration testing',
       candidates: [
-        { name: 'Candidate 1', party: 'Party A', profile_image: 'image1.png' },
-        { name: 'Candidate 2', party: 'Party B', profile_image: 'image2.png' }
+        { name: 'Candidate 1', party: 'Party A', profile_image: 'image1.png', description: 'Candidate 1 description' },
+        { name: 'Candidate 2', party: 'Party B', profile_image: 'image2.png', description: 'Candidate 2 description' },
       ],
       start_time: now.toISOString(),
       end_time: tomorrow.toISOString(),
-      eligible_governorates: ['Cairo', 'Alexandria']
+      eligible_governorates: ['Cairo', 'Alexandria'],
+      election_image: 'election_image.png', // URL to election image
     };
   }
 

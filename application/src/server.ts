@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { logger } from './logger';
 import { IdentityManager } from './fabric-utils/identityManager';
 import { fabricAdminConnection } from './fabric-utils/fabric';
-import { userRouter } from "./routes/user.route";
+import { authRouter } from "./routes/auth.route";
 import { votesRouter } from "./routes/votes.route";
 import { electionRouter } from "./routes/elections.route";
 import { ledgerRouter } from "./routes/ledger.route";
@@ -77,7 +77,7 @@ export const createServerApp = async () => {
         }
     }
 
-    app.use("/api/v1/users", userRouter);
+    app.use("/api/v1/auth", authRouter);
     app.use("/api/v1/votes", votesRouter);
     app.use("/api/v1/elections", electionRouter);
     app.use("/api/v1/ledger", ledgerRouter);

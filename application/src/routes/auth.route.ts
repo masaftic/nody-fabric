@@ -40,4 +40,4 @@ router.get('/voter-info', authenticate, authorize(['voter', 'admin']), (req: Req
     });
 });
 
-export { router as userRouter }
+export { router as authRouter }

@@ -1,5 +1,5 @@
 import express, { Express } from 'express';
-import { userRouter } from '../../routes/user.route';
+import { authRouter } from '../../routes/auth.route';
 import { votesRouter } from '../../routes/votes.route';
 import { electionRouter } from '../../routes/elections.route';
 import { ledgerRouter } from '../../routes/ledger.route';
@@ -14,7 +14,7 @@ export function createTestServer(): Express {
     app.use(express.json());
 
     // Routes
-    app.use("/api/v1/users", userRouter);
+    app.use("/api/v1/users", authRouter);
     app.use("/api/v1/votes", votesRouter);
     app.use("/api/v1/elections", electionRouter);
     app.use("/api/v1/ledger", ledgerRouter);

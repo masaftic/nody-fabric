@@ -114,7 +114,7 @@ export async function createElection(req: Request<{}, {}, CreateElectionRequest>
                 eligible_governorates,
                 election_image
             });
-        }, false);
+        }, true);
 
         const response: CreateElectionResponse = {
             status: "success",

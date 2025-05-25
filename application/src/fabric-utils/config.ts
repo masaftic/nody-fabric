@@ -12,6 +12,8 @@ export const fabricCaTlsCertPath = path.join(__dirname, '..', '..', 'hyperledger
 export const caURL = 'https://localhost:7054';
 export const peerHostAlias = 'peer0.org1.example.com';
 
-export const adminWalletPath = path.join(__dirname, '..', 'wallet', 'admin');
+export const walletPath = path.join(__dirname, '..', '..', 'wallet');
 
-export const usersWalletPath = path.join(__dirname, '..', 'wallet', 'users');
+export const adminWalletPath = path.join(walletPath, 'admin');
+
+export const usersWalletPath = path.join(walletPath, 'users');

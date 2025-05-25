@@ -1,18 +1,23 @@
 import express, { NextFunction, Request, Response } from 'express';
+import { createServer } from 'http';
 import { logger } from './logger';
-import { caURL, fabricCaTlsCertPath, tlsCertPath } from './fabric-utils/config';
 import { IdentityManager } from './fabric-utils/identityManager';
-import { BlockChainRepository } from './fabric-utils/BlockChainRepository';
-import { fabricConnection, fabricAdminConnection } from './fabric-utils/fabric';
+import { fabricAdminConnection } from './fabric-utils/fabric';
 import { userRouter } from "./routes/user.route";
 import { votesRouter } from "./routes/votes.route";
 import { electionRouter } from "./routes/election.route";
 import { ledgerRouter } from "./routes/ledger.route";
 import connectDb, { isDbConnected } from './config/connectToDbAtlas';
 import { initFabricEventService } from './service/fabric-event.service';
+import { initSocketIOService } from './service/socket-io.service';
 
 export const createServerApp = async () => {
     const app = express();
+    const httpServer = createServer(app);
+
+    // Initialize Socket.IO for remote signing
+    const io = initSocketIOService(httpServer);
+    logger.info('Socket.IO service initialized for remote signing');
 
     // Connect to MongoDB (only used for user data and vote records)
     const dbConnected = await connectDb();
@@ -100,5 +105,5 @@ export const createServerApp = async () => {
         });
     });
 
-    return app;
+    return httpServer;
 }

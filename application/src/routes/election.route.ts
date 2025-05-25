@@ -14,7 +14,7 @@ const router = Router();
 router.get("/", authenticate, getAllElections);
 router.get("/:electionId", authenticate, getElection);
 
-router.post("/", authenticate, authorize(['admin']), createElection);
+router.post("/", authenticate, createElection);
 // router.get("/:electionId/analytics", getElectionAnalytics);
 
 export {

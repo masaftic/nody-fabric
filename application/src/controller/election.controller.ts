@@ -15,10 +15,10 @@ import { logger } from "../logger";
 export async function getElection(req: Request, res: Response) {
     try {
         // Get userId from JWT token instead of request body
-        const userId = req.user?.userId;
+        const userId = req.user!.userId;
         const { electionId } = req.params;
         
-        if (!userId || !electionId) {
+        if (!electionId) {
             res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
             return;
         }
@@ -26,7 +26,7 @@ export async function getElection(req: Request, res: Response) {
         const election = await withFabricConnection(userId, async (contract) => {
             const blockchainRepo = new BlockChainRepository(contract);
             return await blockchainRepo.getElection(electionId);
-        });
+        }, true);
 
         res.status(StatusCodes.OK).json(election as GetElectionResponse);
     } catch (error) {
@@ -96,7 +96,7 @@ export async function createElection(req: Request<{}, {}, CreateElectionRequest>
                 end_time,
                 eligible_governorates
             });
-        });
+        }, true);
 
         const response: CreateElectionResponse = {
             status: "success",

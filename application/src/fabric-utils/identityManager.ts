@@ -3,7 +3,7 @@ import { IEnrollmentRequest, IRegisterRequest } from 'fabric-ca-client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { User, Utils } from 'fabric-common';
-import { caURL, tlsCertPath } from './config';
+import { adminWalletPath, caURL, tlsCertPath, usersWalletPath, walletPath } from './config';
 
 class IdentityManagerError extends Error {
     constructor(message: string, public readonly cause?: Error) {
@@ -14,7 +14,6 @@ class IdentityManagerError extends Error {
 
 export class IdentityManager {
     private ca: FabricCAServices;
-    private walletPath: string;
     private caUrl: string = caURL; 
     private tlsCert: string = tlsCertPath;
 
@@ -26,19 +25,18 @@ export class IdentityManager {
             };
 
             this.ca = new FabricCAServices(this.caUrl, options);
-            this.walletPath = path.join(__dirname, '..', 'wallet');
         } catch (error) {
             throw new IdentityManagerError('Failed to initialize IdentityManager', error as Error);
         }
     }
 
     async enrollAdmin(): Promise<User> {
-        const adminCertPath = path.join(this.walletPath, 'admin', 'cert.pem');
-        const adminKeyPath = path.join(this.walletPath, 'admin', 'key.pem');
+        const adminCertPath = path.join(adminWalletPath, 'cert.pem');
+        const adminKeyPath = path.join(adminWalletPath, 'key.pem');
 
         try {
             // Verify wallet directory exists
-            await fs.mkdir(this.walletPath, { recursive: true });
+            await fs.mkdir(walletPath, { recursive: true });
 
             const [certExists, keyExists] = await Promise.all([
                 fs.access(adminCertPath).then(() => true).catch(() => false),
@@ -64,8 +62,8 @@ export class IdentityManager {
 
     async loadExistingAdmin(): Promise<User> {
         try {
-            const certPath = path.join(this.walletPath, 'admin', 'cert.pem');
-            const keyPath = path.join(this.walletPath, 'admin', 'key.pem');
+            const certPath = path.join(adminWalletPath, 'cert.pem');
+            const keyPath = path.join(adminWalletPath, 'key.pem');
 
             console.log('Loading existing admin credentials');
             const [certificate, privateKeyPEM] = await Promise.all([
@@ -182,8 +180,8 @@ export class IdentityManager {
     }
 
     async loadUserCredentials(userId: string): Promise<[string, string]> {
-        const certPath = path.join(`${this.walletPath}`, 'users', userId, 'cert.pem');
-        const keyPath = path.join(`${this.walletPath}`, 'users', userId, 'key.pem');
+        const certPath = path.join(usersWalletPath, userId, 'cert.pem');
+        const keyPath = path.join(usersWalletPath, userId, 'key.pem');
 
         return await Promise.all([
             fs.readFile(certPath, 'utf8'),
@@ -192,8 +190,8 @@ export class IdentityManager {
     }
 
     async loadAdminCredentials(): Promise<[string, string]> {
-        const certPath = path.join(this.walletPath, 'admin', 'cert.pem');
-        const keyPath = path.join(this.walletPath, 'admin', 'key.pem');
+        const certPath = path.join(adminWalletPath, 'cert.pem');
+        const keyPath = path.join(adminWalletPath, 'key.pem');
 
         return await Promise.all([
             fs.readFile(certPath, 'utf8'),
@@ -211,7 +209,7 @@ export class IdentityManager {
             }
 
             const certsDir = path.join(
-                this.walletPath,
+                walletPath,
                 userId === 'admin' ? 'admin' : `users/${userId}`
             );
 

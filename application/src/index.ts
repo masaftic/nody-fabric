@@ -9,10 +9,11 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 
 async function main() {
-    const app = await createServerApp();
+    const httpServer = await createServerApp();
 
-    app.listen(3000, () => {
+    httpServer.listen(3000, () => {
         console.log('Server is running on port 3000');
+        console.log('Socket.IO service enabled for remote signing');
     });
 }
 

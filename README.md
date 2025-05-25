@@ -4,7 +4,8 @@ This project implements a blockchain-based e-voting system using Hyperledger Fab
 node backend acts as a proxy between the frontend and the blockchain network, handling user requests and responses.
 
 ## Api documentation
-Api documentation is available in the `API.md` file. It provides details on the endpoints, request and response formats, and error handling.
+
+Api documentation is available in the [API.md](./docs/API.md) file. It provides details on the endpoints, request and response formats, and error handling.
 
 ## Requirements
 

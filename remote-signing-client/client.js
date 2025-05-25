@@ -84,22 +84,28 @@ socket.on('signing-request', async (data) => {
             // Sign the digest
             const signature = ecdsaSign(digest);
 
-            // Create response including the responseEvent if present
+            // Create response
             const response = {
                 userId: data.userId,
                 requestId: data.requestId,
-                signature: Buffer.from(signature).toString('base64'), // Convert signature to base64 string
-                responseEvent: data.responseEvent // Include the responseEvent if server provided it
+                signature: Buffer.from(signature).toString('base64') // Convert signature to base64 string
             };
 
-            console.log(`Sending signing response for request: signing-response:${response.requestId}`);
+            console.log(`Sending signing response for request: ${response.requestId}`);
 
-            // Emit response
-            socket.emit(`signing-response:${response.requestId}`, response);
+            // Emit simplified response - always using the same event name
+            socket.emit('signing-response', response);
 
             console.log(`Automatically signed request ${data.requestId}`);
         } else {
             console.error(`Key not found at ${keyPath}, cannot sign request`);
+            
+            // Send error response
+            socket.emit('signing-response', {
+                userId: data.userId,
+                requestId: data.requestId,
+                error: `Signing failed: Private key not found at ${keyPath}`
+            });
         }
     } catch (error) {
         console.error('Error during signing:', error);
@@ -108,7 +114,6 @@ socket.on('signing-request', async (data) => {
         socket.emit('signing-response', {
             userId: data.userId,
             requestId: data.requestId,
-            responseEvent: data.responseEvent,
             error: `Signing failed: ${error.message}`
         });
     }

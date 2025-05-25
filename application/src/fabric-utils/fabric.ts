@@ -6,7 +6,7 @@ import path from "path";
 import * as crypto from 'crypto';
 import { signers } from "@hyperledger/fabric-gateway";
 import { logger } from "../logger";
-import { hasConnectedSigningClients, registerSigningResponseHandler } from "../service/socket-io.service";
+import { hasConnectedSigningClients, registerSigningHandler } from "../service/socket-io.service";
 
 async function adminIdentity(): Promise<Identity> {
     const adminCredPath = path.join(adminWalletPath, '..', 'admin');
@@ -63,7 +63,6 @@ async function userSigner(userId: string, useRemoteSigning: boolean = false): Pr
 }
 
 
-
 // Simple function to request a signature from the remote client via Socket.IO
 async function requestRemoteSignature(userId: string, digest: Uint8Array): Promise<Uint8Array> {
     return new Promise((resolve, reject) => {
@@ -81,18 +80,17 @@ async function requestRemoteSignature(userId: string, digest: Uint8Array): Promi
         // Generate a unique request ID
         const requestId = crypto.randomUUID();
 
-        // Set up simple response handler with a direct event name
-        const responseEvent = `signing-response:${requestId}`;
-
         // Set timeout
         const timeout = setTimeout(() => {
             // Clean up the handler when timing out
-            delete global.signingResponseHandlers[responseEvent];
+            if (global.signingHandlers) {
+                delete global.signingHandlers[requestId];
+            }
             reject(new Error('Remote signing request timed out'));
         }, 30000); // 30 seconds timeout
 
-        // Register handler for the specific response event
-        registerSigningResponseHandler(responseEvent, (data: any) => {
+        // Register handler for this signing request
+        registerSigningHandler(requestId, (data) => {
             logger.info(`Received remote signing response for request ${requestId}`);
             logger.debug(`Remote signing response data: ${JSON.stringify(data)}`);
 
@@ -113,11 +111,10 @@ async function requestRemoteSignature(userId: string, digest: Uint8Array): Promi
 
         logger.debug(`digest: ${digest}`);
 
-        // Emit the signing request with the specific response event name
+        // Emit the signing request to the client
         global.socketService.emit('signing-request', {
             userId,
             requestId,
-            responseEvent,
             digest: Buffer.from(digest).toString('base64')
         });
 

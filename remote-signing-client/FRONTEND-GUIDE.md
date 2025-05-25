@@ -112,22 +112,34 @@ socket.on('signing-request', async (data) => {
 ### 5. Implement the Signing Function
 
 ```javascript
-async function signDigest(digest) {
-    // This is where you implement the actual signing logic using:
-    // - A hardware wallet
-    // - Browser/app cryptography APIs
-    // - A secure enclave
-    // - Or any other secure key storage and signing method
-    
-    // Sample implementation using WebCrypto (browser)
-    // Note: You'll need to import the private key into the browser's key store
-    const signature = await window.crypto.subtle.sign(
-        { name: 'ECDSA', hash: { name: 'SHA-256' } },
-        privateKey, // This should be securely stored/accessed
-        digest
-    );
-    
-    return new Uint8Array(signature);
+// This is where you implement the actual signing logic using:
+
+// Note: You'll need to import the private key into the browser's key store
+// You must use this algorithm to match the server's expectations
+// Try to implement it in the browser
+function ecdsaSign(digest) { // Uint8Array -> Uint8Array | null
+    try {
+        // Create a key object from the PEM
+        if (!fs.existsSync(keyPath)) {
+            throw new Error(`Private key file not found at: ${keyPath}`);
+        }
+
+        const privateKey = crypto.createPrivateKey(key);
+
+        // Extract the key in JWK format
+        const jwk = privateKey.export({ format: 'jwk' });
+
+        if (!jwk.d) throw new Error('Invalid key format');
+
+        // Convert the base64url-encoded private key to raw bytes
+        const privateKeyBytes = Buffer.from(jwk.d, 'base64');
+
+        // Sign using noble/curves library with lowS option like in the Hyperledger implementation
+        return p256.sign(digest, privateKeyBytes, { lowS: true }).toDERRawBytes();
+    } catch (err) {
+        console.error('Error in ecdsa signer:', err);
+        return null;
+    }
 }
 ```
 
@@ -171,24 +183,24 @@ When submitting a transaction to the blockchain:
 
 This is handled automatically by the server, but it explains why you might see multiple signing requests for a single user action.
 
-## Security Considerations
 
-1. Never transmit the private key over the network
-2. Implement proper authentication before enabling signing
-3. Verify that the signing requests are legitimate
-4. Consider adding a visual confirmation for users before signing
-5. In production, implement proper TLS/SSL for all WebSocket connections
+## Testing
 
-## Testing Your Implementation
+First register a user with the server. on /api/v1/users/register endpoint.
+Get the user-id of the registered user.
 
-You can test your implementation using the provided test script:
+navigate to the `remote-signing-client` directory and type into terminal:
+
+```bash
+export USER_ID=<user-id>
+```
+
+Then run the client application and ensure it connects to the WebSocket server with.
 
 ```bash
 npm start
 ```
 
-This will start a simple WebSocket client that simulates the signing process.
+## Todo
 
-## Need Help?
-
-If you encounter any issues or have questions about the WebSocket flow, please contact the blockchain team for assistance.
+- [ ] Implement transaction info about the signing request (what the user is actually signing).

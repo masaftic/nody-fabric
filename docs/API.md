@@ -9,8 +9,7 @@ This document provides an overview of the Fabric Blockchain e-Voting System API 
 - [Votes API](./votes-api.md) - Endpoints for casting votes and retrieving voting results
 - [Audits API](./audits-api.md) - Endpoints for audit-related operations
 - [Auth API](./auth-api.md) - Endpoints for authentication and authorization
-
-Note: Image uploads api endpoints not yet implemented.
+- [Uploads API](./uploads-api.md) - Endpoints for uploading and retrieving images for elections and candidates
 
 ## Remote Signing with Socket.IO
 

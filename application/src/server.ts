@@ -5,11 +5,12 @@ import { IdentityManager } from './fabric-utils/identityManager';
 import { fabricAdminConnection } from './fabric-utils/fabric';
 import { userRouter } from "./routes/user.route";
 import { votesRouter } from "./routes/votes.route";
-import { electionRouter } from "./routes/election.route";
+import { electionRouter } from "./routes/elections.route";
 import { ledgerRouter } from "./routes/ledger.route";
 import connectDb, { isDbConnected } from './config/connectToDbAtlas';
 import { initFabricEventService } from './service/fabric-event.service';
 import { initSocketIOService } from './service/socket-io.service';
+import { uploadsRouter } from './routes/uploads.route';
 
 export const createServerApp = async () => {
     const app = express();
@@ -80,6 +81,7 @@ export const createServerApp = async () => {
     app.use("/api/v1/votes", votesRouter);
     app.use("/api/v1/elections", electionRouter);
     app.use("/api/v1/ledger", ledgerRouter);
+    app.use("/api/v1/uploads", uploadsRouter);
 
     // Add a health check endpoint
     app.get('/health', (req: Request, res: Response) => {

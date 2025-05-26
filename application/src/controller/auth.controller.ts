@@ -6,15 +6,16 @@ import { twilioService } from "../service/twilio.service";
 import verifyPhoneNumber from "../utils/verifyPhoneNumber";
 import BadRequestError from "../errors/BadRequest.error";
 import { userService } from '../service/user.service';
-import UserModel, { UserRegisterRequest } from '../models/user.model';
+import UserModel, { UserRegisterRequest, UserRole } from '../models/user.model';
 import { fabricAdminConnection, fabricConnection, withFabricAdminConnection } from "../fabric-utils/fabric";
 import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
 import { generateToken } from '../utils/jwt.utils';
 import crypto from 'crypto';
+import { invitationService } from "../service/invitation.service";
 
 
 async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response) {
-    if (!req.body.nationalId || !req.body.phone || !req.body.governorate) {
+    if (!req.body.national_id || !req.body.phone || !req.body.governorate) {
         res.status(StatusCodes.BAD_REQUEST).json({
             message: 'Missing required fields'
         });
@@ -22,22 +23,41 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
     }
 
     const identityManager = new IdentityManager();
-    const userId = crypto.randomUUID(); // voterId
+    const user_id = crypto.randomUUID(); // voterId
 
     try {
-        const admin = await identityManager.enrollAdmin();
-        const secret = await identityManager.registerUser(admin, userId, '', 'voter');
+        // Default role is 'voter'
+        let role: UserRole = UserRole.Voter;
 
-        const userEnrollment = await identityManager.enrollUser(userId, secret);
+        // Check if invitation code is provided
+        if (req.body.invitation_code) {
+            // Validate the invitation code
+            const validatedRole = await invitationService.validateAndUseCode(req.body.invitation_code, user_id);
+
+            if (!validatedRole) {
+                res.status(StatusCodes.BAD_REQUEST).json({
+                    message: 'Invalid or expired invitation code'
+                });
+                return;
+            }
+
+            // If code is valid, set the role from the invitation code
+            role = validatedRole;
+        }
+
+        const admin = await identityManager.enrollAdmin();
+        const secret = await identityManager.registerUser(admin, user_id, '', role);
+
+        const userEnrollment = await identityManager.enrollUser(user_id, secret);
 
         // Save user details in MongoDB
         const userData = new UserModel({
-            userId,
-            nationalId: req.body.nationalId,
+            userId: user_id,
+            nationalId: req.body.national_id,
             phone: req.body.phone,
             governorate: req.body.governorate,
             certificate: userEnrollment.certificate,
-            role: 'voter',
+            role: role,
             status: 'active',
         });
 
@@ -45,21 +65,22 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
 
         await withFabricAdminConnection(async (contract) => {
             const blockchainRepo = new BlockChainRepository(contract);
-            await blockchainRepo.registerUser(userId, req.body.governorate);
+            await blockchainRepo.registerUser(user_id, req.body.governorate);
         });
 
         // Generate JWT token
-        const token = generateToken({
-            userId,
-            role: 'voter'
+        const access_token = generateToken({
+            user_id: user_id,
+            role,
+            governorate: req.body.governorate,
         });
 
         res.status(StatusCodes.CREATED).json({
             message: 'User registered successfully',
-            userId,
-            token,
+            user_id,
+            access_token,
             certificate: userEnrollment.certificate,
-            key: userEnrollment.key.toBytes(),
+            private_key: userEnrollment.key.toBytes(),
         });
     } catch (error: any) {
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
@@ -154,15 +175,15 @@ export async function login(req: Request, res: Response) {
     }
 
     // Generate JWT token
-    const token = generateToken({
-        userId: matchedUser.userId,
-        role: matchedUser.role
+    const access_token = generateToken({
+        user_id: matchedUser.userId,
+        role: matchedUser.role,
+        governorate: matchedUser.governorate,
     });
 
     res.status(StatusCodes.OK).json({
         message: 'User logged in successfully',
-        token,
-        governorate: matchedUser.governorate
+        access_token,
     });
 }
 

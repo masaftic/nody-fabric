@@ -15,7 +15,7 @@ import { logger } from "../logger";
 export async function getElection(req: Request, res: Response) {
     try {
         // Get userId from JWT token instead of request body
-        const userId = req.user!.userId;
+        const userId = req.user!.user_id;
         const { electionId } = req.params;
         
         if (!electionId) {
@@ -39,7 +39,7 @@ export async function getElection(req: Request, res: Response) {
 
 export async function getAllElections(req: Request, res: Response<GetAllElectionsResponse | { message: string }>) {
     // Get userId from JWT token instead of request body
-    const userId = req.user?.userId;
+    const userId = req.user?.user_id;
     const { status, governorate } = req.query;
     
     if (!userId) {
@@ -88,7 +88,7 @@ export async function getAllElections(req: Request, res: Response<GetAllElection
 
 export async function createElection(req: Request<{}, {}, CreateElectionRequest>, res: Response<CreateElectionResponse>) {
     // Get userId from JWT token instead of request body
-    const userId = req.user?.userId;
+    const userId = req.user?.user_id;
     const { name, description, candidates, start_time, end_time, eligible_governorates, election_image } = req.body;
 
     // Validate required fields
@@ -114,7 +114,7 @@ export async function createElection(req: Request<{}, {}, CreateElectionRequest>
                 eligible_governorates,
                 election_image
             });
-        }, true);
+        }, false);
 
         const response: CreateElectionResponse = {
             status: "success",

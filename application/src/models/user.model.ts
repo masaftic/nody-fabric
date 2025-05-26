@@ -1,5 +1,13 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
 import bcryptjs from "bcryptjs"
+
+
+export enum UserRole {
+    Voter = "voter",
+    ElectionCommission = "election_commission",
+    Auditor = "auditor"
+}
+
 export interface IUser extends Document {
     userId: string;
     nationalId: string;
@@ -9,7 +17,7 @@ export interface IUser extends Document {
     verifyCodeExpireOn?: Date;
     certificate: string;
     governorate: string;
-    role: "voter" | "admin" | "auditor";
+    role: UserRole;
     status: "active" | "suspended";
 }
 
@@ -21,9 +29,10 @@ export interface UserModel extends Model<IUser, {}, IUserMethods> { }
 
 
 export interface UserRegisterRequest {
-    nationalId: string;
+    national_id: string;
     phone: string;
     governorate: string;
+    invitation_code?: string; // Optional invitation code for admin or auditor registration
 }
 
 
@@ -75,8 +84,10 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
     },
     role: {
         type: String,
-        enum: ["voter", "admin", "auditor"],
-        default: "voter",
+        enum: Object.values(UserRole),
+        default: UserRole.Voter, // Default role is voter
+        required: [true, "User role is required"],
+        index: true,
     },
     status: {
         type: String,

@@ -1,14 +1,16 @@
 import jwt from 'jsonwebtoken';
 import { Request } from 'express';
 import { logger } from '../logger';
+import { UserRole } from '../models/user.model';
 
 // TODO: Move this to environment variables in production
 const JWT_SECRET = 'your-secret-key-should-be-in-env-variables';
 const TOKEN_EXPIRATION = '1d'; // Token expires in 1 day
 
 export interface JwtPayload {
-    userId: string;
-    role?: 'voter' | 'admin' | 'auditor';
+    user_id: string;
+    role: UserRole;
+    governorate: string;
 }
 
 /**

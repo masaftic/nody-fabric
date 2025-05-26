@@ -2,17 +2,14 @@
 
 ## `POST /api/v1/auth/register`
 
-Params:
-
-- (optional) `invitation_code`: invitation code for roles (e.g., election commission, auditor)
-
 Request:
 
 ```json
 {
-    "nationalId": "30206281400132",
+    "national_id": "30206281400132",
     "phone": "01222544472",
-    "governorate": "Governorate1"
+    "governorate": "Governorate1",
+    "invitation_code": "ABC1234" // Optional, used for roles like election commission or auditor
 }
 ```
 

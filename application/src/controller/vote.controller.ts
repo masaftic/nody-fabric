@@ -10,7 +10,7 @@ async function vote(req: Request, res: Response, next: NextFunction): Promise<vo
     try {
         const { electionId, candidateId } = req.body;
         // Get userId from JWT token
-        const userId = req.user?.userId;
+        const userId = req.user?.user_id;
         
         if (!userId || !electionId || !candidateId) {
             res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
@@ -35,7 +35,7 @@ async function vote(req: Request, res: Response, next: NextFunction): Promise<vo
 
 async function getVote(req: Request, res: Response) {
     // Get userId from JWT token
-    const userId = req.user?.userId;
+    const userId = req.user?.user_id;
     const { voteId } = req.params;
     
     if (!userId || !voteId) {
@@ -83,7 +83,7 @@ async function getUserVotes(req: Request, res: Response): Promise<void> {
     // If admin or auditor accessing another user's votes, allow it
     // If no userId provided, use the authenticated user's ID
     if (!userId && req.user) {
-        userId = req.user.userId;
+        userId = req.user.user_id;
     }
     
     if (!userId) {
@@ -108,7 +108,7 @@ async function getUserVotes(req: Request, res: Response): Promise<void> {
 
 async function submitVoterFeedback(req: Request, res: Response) {
     const { election_id, receipt, feedback, comments } = req.body;
-    const userId = req.user?.userId;
+    const userId = req.user?.user_id;
 
     if (!userId || !election_id || !receipt || !feedback) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
@@ -139,7 +139,7 @@ async function getVoteTally(req: Request, res: Response): Promise<void> {
         }
         
         // Get the election details to include candidate information
-        const userId = req.user?.userId;
+        const userId = req.user?.user_id;
         if (!userId) {
             res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Authentication required' });
             return;

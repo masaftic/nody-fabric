@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { verifyToken, extractTokenFromHeader, JwtPayload } from '../utils/jwt.utils';
 import { logger } from '../logger';
+import { UserRole } from '../models/user.model';
 
 // Extend Express Request to include user context
 declare global {
@@ -38,7 +39,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
  * Role-based authorization middleware
  * @param roles Array of allowed roles for the route
  */
-export function authorize(roles: ('voter' | 'admin' | 'auditor')[]) {
+export function authorize(roles: UserRole[]) {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) {
             res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Authentication required' });

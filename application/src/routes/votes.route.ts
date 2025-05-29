@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getUserVote, getAllVotes, userVote, getUserVotes, getVoteTally } from "../controller/vote.controller";
+import { getUserVote, getAllVotes, userVote, getUserVotes, getVoteTally, verifyVote, submitVoterFeedback, getVoteDetailsByReceipt } from "../controller/vote.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { UserRole } from "../models/user.model";
 
@@ -10,10 +10,24 @@ router.route("/")
     .post(authenticate, userVote)
     .get(authenticate, authorize([UserRole.ElectionCommission, UserRole.Auditor]), getAllVotes)
 
+// Feedback submission route
+router.post("/feedback", authenticate, submitVoterFeedback);
+
+// Vote verification route - public API that can be used without authentication
+router.get("/verify/:receipt", verifyVote);
+
+// Authenticated route for detailed vote information
+router.get("/details/:receipt", authenticate, getVoteDetailsByReceipt);
+
+// Authenticated route for detailed vote information
+router.get("/details/:receipt", authenticate, getVoteDetailsByReceipt);
+
 // Analytics route must come before path with parameters to avoid conflicts
 router.get("/user/:userId", authenticate, authorize([UserRole.Auditor, UserRole.ElectionCommission]), getUserVotes)
 router.get("/:id", authenticate, authorize([UserRole.Auditor, UserRole.ElectionCommission]), getUserVote)
 
+// Get vote tally for an election
+router.get("/tally/:electionId", authenticate, getVoteTally);
 
 export {
     router as votesRouter

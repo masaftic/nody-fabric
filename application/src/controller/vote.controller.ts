@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import { fabricConnection, withFabricConnection } from "../fabric-utils/fabric";
+import { fabricConnection, withFabricAdminConnection, withFabricConnection } from "../fabric-utils/fabric";
 import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
 import { StatusCodes } from "http-status-codes";
 import { VoteModel, VoteTallyModel } from "../models/election.model";
+import { FeedbackModel } from "../models/feedback.model";
 import { logger } from "../logger";
 import crypto from 'crypto';
 
@@ -107,15 +108,57 @@ async function getUserVotes(req: Request, res: Response): Promise<void> {
 
 
 async function submitVoterFeedback(req: Request, res: Response) {
-    const { election_id, receipt, feedback, comments } = req.body;
+    const { election_id, receipt, rating, comments } = req.body;
     const userId = req.user?.user_id;
 
-    if (!userId || !election_id || !receipt || !feedback) {
+    if (!userId || !election_id || !receipt || !rating) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
         return;
     }
 
-    // TODO: Implement feedback submission logic
+    try {
+        // Verify the vote exists with this receipt
+        const vote = await VoteModel.findOne({ receipt, election_id });
+        
+        if (!vote) {
+            res.status(StatusCodes.NOT_FOUND).json({ message: 'Vote receipt not found or does not match election' });
+            return;
+        }
+        
+        // Check if the vote belongs to this user
+        if (vote.voter_id !== userId) {
+            res.status(StatusCodes.FORBIDDEN).json({ message: 'This vote receipt does not belong to you' });
+            return;
+        }
+        
+        // Check if feedback already exists for this receipt
+        const existingFeedback = await FeedbackModel.findOne({ receipt });
+        
+        if (existingFeedback) {
+            res.status(StatusCodes.CONFLICT).json({ message: 'Feedback has already been submitted for this vote' });
+            return;
+        }
+        
+        // Create new feedback
+        const feedback = await FeedbackModel.create({
+            voter_id: userId,
+            election_id,
+            receipt,
+            rating: Number(rating),
+            comments: comments || '',
+            created_at: new Date()
+        });
+        
+        res.status(StatusCodes.CREATED).json({
+            message: 'Feedback submitted successfully',
+            feedback_id: feedback._id
+        });
+    } catch (error) {
+        logger.error(`Error submitting voter feedback: ${error instanceof Error ? error.message : String(error)}`);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: `Error submitting voter feedback: ${error instanceof Error ? error.message : String(error)}`
+        });
+    }
 }
 
 /**
@@ -187,11 +230,181 @@ async function getVoteTally(req: Request, res: Response): Promise<void> {
     }
 }
 
+/**
+ * Verify a vote using the receipt
+ * This allows voters to check if their vote was correctly recorded
+ */
+async function verifyVote(req: Request, res: Response): Promise<void> {
+    const { receipt } = req.params;
+    
+    if (!receipt) {
+        res.status(StatusCodes.BAD_REQUEST).json({ message: 'Receipt is required' });
+        return;
+    }
+
+    try {
+        // Find vote in MongoDB by receipt
+        const vote = await VoteModel.findOne({ receipt });
+        
+        if (!vote) {
+            res.status(StatusCodes.NOT_FOUND).json({ 
+                verified: false, 
+                message: 'Vote not found with the provided receipt' 
+            });
+            return;
+        }
+
+        // Get election details to enhance the response
+        let electionName = "Unknown";
+        let candidateName = "Unknown";
+        
+        try {
+            // Use admin connection to get election details
+            await withFabricAdminConnection(async (contract) => {
+                const blockchainRepo = new BlockChainRepository(contract);
+                const election = await blockchainRepo.getElection(vote.election_id);
+                
+                if (election) {
+                    electionName = election.name;
+                    
+                    // Find candidate name
+                    const candidate = election.candidates.find(c => c.candidate_id === vote.candidate_id);
+                    if (candidate) {
+                        candidateName = candidate.name;
+                    }
+                }
+            });
+        } catch (error) {
+            // If we can't get the additional details, continue with the basic verification
+            logger.warn(`Unable to fetch election details for verification: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        
+        // Check if feedback has been submitted
+        const feedback = await FeedbackModel.findOne({ receipt });
+        
+        res.status(StatusCodes.OK).json({
+            verified: true,
+            message: 'Vote verified successfully',
+            vote_details: {
+                election_name: electionName,
+                timestamp: vote.created_at,
+                receipt: vote.receipt
+            },
+            feedback_submitted: !!feedback
+        });
+        
+    } catch (error) {
+        logger.error(`Error verifying vote: ${error instanceof Error ? error.message : String(error)}`);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            verified: false,
+            message: `Error verifying vote: ${error instanceof Error ? error.message : String(error)}`
+        });
+    }
+}
+
+/**
+ * Get detailed vote information for an authenticated user
+ * This allows voters to see the full details of their own vote
+ */
+async function getVoteDetailsByReceipt(req: Request, res: Response): Promise<void> {
+    const { receipt } = req.params;
+    const userId = req.user?.user_id;
+    
+    if (!receipt) {
+        res.status(StatusCodes.BAD_REQUEST).json({ message: 'Receipt is required' });
+        return;
+    }
+
+    if (!userId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Authentication required' });
+        return;
+    }
+
+    try {
+        // Find vote in MongoDB by receipt
+        const vote = await VoteModel.findOne({ receipt });
+        
+        if (!vote) {
+            res.status(StatusCodes.NOT_FOUND).json({ 
+                success: false, 
+                message: 'Vote not found with the provided receipt' 
+            });
+            return;
+        }
+
+        // Verify that the vote belongs to the requesting user
+        if (vote.voter_id !== userId) {
+            res.status(StatusCodes.FORBIDDEN).json({
+                success: false,
+                message: 'You are not authorized to view this vote'
+            });
+            return;
+        }
+
+        // Get election details to enhance the response
+        let electionName = "Unknown";
+        let candidateName = "Unknown";
+        
+        try {
+            // Use admin connection to get election details
+            await withFabricAdminConnection(async (contract) => {
+                const blockchainRepo = new BlockChainRepository(contract);
+                const election = await blockchainRepo.getElection(vote.election_id);
+                
+                if (election) {
+                    electionName = election.name;
+                    
+                    // Find candidate name
+                    const candidate = election.candidates.find(c => c.candidate_id === vote.candidate_id);
+                    if (candidate) {
+                        candidateName = candidate.name;
+                    }
+                }
+            });
+        } catch (error) {
+            // If we can't get the additional details, continue with the basic verification
+            logger.warn(`Unable to fetch election details for verification: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        
+        // Check if feedback has been submitted
+        const feedback = await FeedbackModel.findOne({ receipt });
+        
+        res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Vote details retrieved successfully',
+            vote_details: {
+                election_id: vote.election_id,
+                election_name: electionName,
+                candidate_id: vote.candidate_id,
+                candidate_name: candidateName,
+                timestamp: vote.created_at,
+                receipt: vote.receipt
+            },
+            feedback_submitted: !!feedback,
+            feedback: feedback ? {
+                rating: feedback.rating,
+                comments: feedback.comments,
+                created_at: feedback.created_at
+            } : null
+        });
+        
+    } catch (error) {
+        logger.error(`Error retrieving vote details: ${error instanceof Error ? error.message : String(error)}`);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: `Error retrieving vote details: ${error instanceof Error ? error.message : String(error)}`
+        });
+    }
+}
+
 
 export {
     vote as userVote,
     getVote as getUserVote,
     getVotes as getAllVotes,
     getUserVotes,
-    getVoteTally
+    getVoteTally,
+    verifyVote,
+    submitVoterFeedback,
+    getVoteDetailsByReceipt
 }

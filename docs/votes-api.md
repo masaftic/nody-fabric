@@ -23,24 +23,49 @@ Response:
 }
 ```
 
-## POST `votes/verify`
+## GET `/votes/verify/:receipt`
 
-authorized roles: voter, election commission, auditor
-
-Request:
-
-```json
-{
-    "receipt": "string",
-}
-```
+authorized roles: none (public endpoint)
 
 Response:
 
 ```json
 {
-    "status": "success",
-    "message": "Vote verified successfully"
+    "verified": true,
+    "message": "Vote verified successfully",
+    "vote_details": {
+        "election_name": "string",
+        "timestamp": "2023-10-01T00:00:00Z",
+        "receipt": "string"
+    },
+    "feedback_submitted": true/false
+}
+```
+
+## GET `/votes/details/:receipt`
+
+authorized roles: voter
+
+Response:
+
+```json
+{
+    "success": true,
+    "message": "Vote details retrieved successfully",
+    "vote_details": {
+        "election_id": "string",
+        "election_name": "string",
+        "candidate_id": "string",
+        "candidate_name": "string",
+        "timestamp": "2023-10-01T00:00:00Z",
+        "receipt": "string"
+    },
+    "feedback_submitted": true/false,
+    "feedback": {
+        "rating": 5,
+        "comments": "string",
+        "created_at": "2023-10-01T00:00:00Z"
+    }
 }
 ```
 
@@ -54,7 +79,7 @@ Request:
 {
     "election_id": "string",
     "receipt": "string",
-    "feedback": 1-5, // 1: Very Poor, 2: Poor, 3: Neutral, 4: Good, 5: Excellent
+    "rating": 1-5, // 1: Very Poor, 2: Poor, 3: Neutral, 4: Good, 5: Excellent
     "comments": "string" // optional
 }
 ```
@@ -63,8 +88,8 @@ Response:
 
 ```json
 {
-    "status": "success",
-    "message": "Feedback submitted successfully"
+    "message": "Feedback submitted successfully",
+    "feedback_id": "string"
 }
 ```
 
@@ -115,5 +140,23 @@ Response:
     "voter_id": "string",
     "timestamp": "2023-10-01T00:00:00Z",
     "receipt": "string"
+}
+```
+
+## GET `/votes/tally/:electionId`
+
+authorized roles: voter, election commission, auditor
+
+Response:
+
+```json
+{
+    "election_id": "string",
+    "total_votes": 100,
+    "tallies": {
+        "candidate_id_1": 42,
+        "candidate_id_2": 58
+    },
+    "last_updated": "2023-10-01T00:00:00Z"
 }
 ```

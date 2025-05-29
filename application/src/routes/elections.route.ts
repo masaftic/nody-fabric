@@ -8,6 +8,7 @@ import {
 
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { UserRole } from "../models/user.model";
+import { getVoteTally } from "../controller/vote.controller";
 
 
 const router = Router();
@@ -17,6 +18,8 @@ router.get("/:electionId", authenticate, getElection);
 
 router.post("/", authenticate, authorize([UserRole.ElectionCommission]), createElection);
 // router.get("/:electionId/analytics", getElectionAnalytics);
+
+router.get("/:electionId/tally", authenticate, authorize([UserRole.ElectionCommission, UserRole.Auditor]), getVoteTally);
 
 export {
     router as electionRouter

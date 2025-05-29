@@ -41,7 +41,28 @@ func (s *VotingContract) RegisterUser(ctx contractapi.TransactionContextInterfac
 		return err
 	}
 
-	return ctx.GetStub().PutState(userPrefix+userId, userJSON)
+	err = ctx.GetStub().PutState(userPrefix+userId, userJSON)
+	if err != nil {
+		return err
+	}
+
+	// Emit a user_registered event
+	eventPayload, err := json.Marshal(map[string]string{
+		"user_id":     userId,
+		"governorate": governorate,
+		"role":        role,
+		"timestamp":   time.Now().Format(time.RFC3339),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal event payload: %v", err)
+	}
+
+	err = ctx.GetStub().SetEvent("user_registered", eventPayload)
+	if err != nil {
+		return fmt.Errorf("failed to emit user_registered event: %v", err)
+	}
+
+	return nil
 }
 
 // GetUser retrieves a user by ID
@@ -193,7 +214,30 @@ func (s *VotingContract) UpdateUserStatus(ctx contractapi.TransactionContextInte
 		}
 	}
 
-	return ctx.GetStub().PutState(userPrefix+userID, updatedUserJSON)
+	// Save the updated user to state
+	err = ctx.GetStub().PutState(userPrefix+userID, updatedUserJSON)
+	if err != nil {
+		return err
+	}
+
+	// Emit a user_status_updated event
+	eventPayload, err := json.Marshal(map[string]interface{}{
+		"userId":    userID,
+		"status":    status,
+		"reason":    reason,
+		"updatedBy": clientID,
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal event payload: %v", err)
+	}
+
+	err = ctx.GetStub().SetEvent("user_status_updated", eventPayload)
+	if err != nil {
+		return fmt.Errorf("failed to emit user_status_updated event: %v", err)
+	}
+
+	return nil
 }
 
 // UserRevocation structure to record when a user is revoked/suspended

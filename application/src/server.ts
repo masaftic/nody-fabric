@@ -12,6 +12,7 @@ import { initFabricEventService } from './service/fabric-event.service';
 import { initSocketIOService } from './service/socket-io.service';
 import { uploadsRouter } from './routes/uploads.route';
 import { usersRouter } from './routes/users.route';
+import { auditRouter } from './routes/audits.route';
 
 export const createServerApp = async () => {
     const app = express();
@@ -91,6 +92,7 @@ export const createServerApp = async () => {
     app.use("/api/v1/elections", electionRouter);
     app.use("/api/v1/ledger", ledgerRouter);
     app.use("/api/v1/uploads", uploadsRouter);
+    app.use("/api/v1/audits", auditRouter);
 
     // Add a health check endpoint
     app.get('/health', (req: Request, res: Response) => {

@@ -11,7 +11,6 @@ router.route("/")
     .get(authenticate, authorize([UserRole.ElectionCommission, UserRole.Auditor]), getAllVotes)
 
 // Analytics route must come before path with parameters to avoid conflicts
-// router.get("/analytics/:electionId", authenticate, getVoteTally)
 router.get("/user/:userId", authenticate, authorize([UserRole.Auditor, UserRole.ElectionCommission]), getUserVotes)
 router.get("/:id", authenticate, authorize([UserRole.Auditor, UserRole.ElectionCommission]), getUserVote)
 

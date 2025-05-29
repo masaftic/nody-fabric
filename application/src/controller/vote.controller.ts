@@ -137,40 +137,48 @@ async function getVoteTally(req: Request, res: Response): Promise<void> {
             res.status(StatusCodes.NOT_FOUND).json({ message: 'No votes found for this election' });
             return;
         }
-        
-        // Get the election details to include candidate information
-        const userId = req.user?.user_id;
-        if (!userId) {
-            res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Authentication required' });
-            return;
-        }
-        
-        const election = await withFabricConnection(userId, async (contract) => {
-            const blockchainRepo = new BlockChainRepository(contract);
-            return await blockchainRepo.getElection(electionId);
-        });
-        
-        // Create a more detailed response that includes candidate details with their vote counts
-        const candidatesWithVotes = election.candidates.map(candidate => {
-            const candidateId = candidate.candidate_id;
-            return {
-                candidate_id: candidateId,
-                name: candidate.name,
-                party: candidate.party,
-                votes: tally.tallies.get(candidateId) !== undefined
-                    ? tally.tallies.get(candidateId)
-                    : (() => { throw new Error(`Unexpected Candidate ID ${candidateId} not found in tally`); })(),
-            };
-        });
-        
-        res.status(StatusCodes.OK).json({
-            message: 'Vote tally retrieved successfully',
+
+        res.status(200).json({
             election_id: electionId,
-            election_name: election.name,
             total_votes: tally.total_votes,
-            candidates: candidatesWithVotes,
+            tallies: Object.fromEntries(tally.tallies), // Convert Map to plain object
             last_updated: tally.last_updated
         });
+        return;
+        
+        // // Get the election details to include candidate information
+        // const userId = req.user?.user_id;
+        // if (!userId) {
+        //     res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Authentication required' });
+        //     return;
+        // }
+        
+        // const election = await withFabricConnection(userId, async (contract) => {
+        //     const blockchainRepo = new BlockChainRepository(contract);
+        //     return await blockchainRepo.getElection(electionId);
+        // });
+        
+        // // Create a more detailed response that includes candidate details with their vote counts
+        // const candidatesWithVotes = election.candidates.map(candidate => {
+        //     const candidateId = candidate.candidate_id;
+        //     return {
+        //         candidate_id: candidateId,
+        //         name: candidate.name,
+        //         party: candidate.party,
+        //         votes: tally.tallies.get(candidateId) !== undefined
+        //             ? tally.tallies.get(candidateId)
+        //             : (() => { throw new Error(`Unexpected Candidate ID ${candidateId} not found in tally`); })(),
+        //     };
+        // });
+        
+        // res.status(StatusCodes.OK).json({
+        //     message: 'Vote tally retrieved successfully',
+        //     election_id: electionId,
+        //     election_name: election.name,
+        //     total_votes: tally.total_votes,
+        //     candidates: candidatesWithVotes,
+        //     last_updated: tally.last_updated
+        // });
     } catch (error) {
         logger.error(`Error retrieving vote tally: ${error instanceof Error ? error.message : String(error)}`);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({

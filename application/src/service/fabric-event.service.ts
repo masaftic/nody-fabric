@@ -2,6 +2,7 @@ import { Contract, Network, checkpointers } from '@hyperledger/fabric-gateway';
 import { logger } from '../logger';
 import { BlockChainRepository } from '../fabric-utils/BlockChainRepository';
 import { CreateElectionRequest, Election, Vote, VoteModel, VoteTallyModel } from '../models/election.model';
+import { AuditEventModel, createAuditEvent, EventType } from '../models/audit.model';
 
 /**
  * Service to handle Fabric events for logging and real-time updates
@@ -140,7 +141,17 @@ export class FabricEventService {
 
                   case 'tally_computed':
                     const tallyData = JSON.parse(Buffer.from(event.payload).toString());
-                    logger.info(`Tally computed for election ${tallyData.electionId || tallyData.election_id}`);
+                    await this.handleTallyComputed(tallyData);
+                    break;
+                    
+                  case 'user_registered':
+                    const userData = JSON.parse(Buffer.from(event.payload).toString());
+                    await this.handleUserRegistered(userData);
+                    break;
+                    
+                  case 'user_status_updated':
+                    const userStatusData = JSON.parse(Buffer.from(event.payload).toString());
+                    await this.handleUserStatusUpdated(userStatusData);
                     break;
 
                   default:
@@ -224,7 +235,7 @@ export class FabricEventService {
     // Verify elections and compute tallies if needed
     for (const election of elections) {
       // Compute the current tally for the election (optional, can be commented out)
-      await blockchainRepo.computeVoteTally(election.election_id);
+      await blockchainRepo.computeVoteTally(crypto.randomUUID(), election.election_id);
     }
 
     logger.info(`Verified ${elections.length} elections on the blockchain`);
@@ -256,6 +267,23 @@ export class FabricEventService {
     const electionId = electionData.election_id;
     logger.info(`Election ${electionId} created on blockchain: "${electionData.name}"`);
 
+    try {
+      // Create audit event for election creation
+      const auditEvent = createAuditEvent('election_created', {
+        election_id: electionId,
+        name: electionData.name,
+        creator_id: 'system', // In a real system, this would come from the event
+        eligible_governorates: electionData.eligible_governorates,
+        candidate_count: electionData.candidates.length
+      });
+      
+      // Store the audit event in MongoDB
+      await AuditEventModel.create(auditEvent);
+      
+      logger.info(`Election creation audit event recorded for ${electionId}`);
+    } catch (error) {
+      logger.error(`Failed to record election creation audit event: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
@@ -265,7 +293,25 @@ export class FabricEventService {
   private async handleElectionUpdated(electionData: any): Promise<void> {
     const electionId = electionData.election_id || electionData.electionId;
     logger.info(`Election ${electionId} updated on blockchain`);
-
+    
+    try {
+      // Create audit event for election update
+      const auditEvent = createAuditEvent('election_updated', {
+        election_id: electionId,
+        updater_id: 'system', // In a real system, this would come from the event
+        updated_fields: Object.keys(electionData).filter(key => 
+          key !== 'election_id' && key !== 'electionId'
+        ),
+        status: electionData.status || 'unknown'
+      });
+      
+      // Store the audit event in MongoDB
+      await AuditEventModel.create(auditEvent);
+      
+      logger.info(`Election update audit event recorded for ${electionId}`);
+    } catch (error) {
+      logger.error(`Failed to record election update audit event: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
@@ -283,9 +329,97 @@ export class FabricEventService {
       // Update the vote tally in real-time
       await this.updateVoteTally(voteData.election_id, voteData.candidate_id);
 
+      // Create audit event for the vote
+      const auditEvent = createAuditEvent('vote_cast', {
+        election_id: voteData.election_id,
+        voter_id: voteData.voter_id,
+        candidate_id: voteData.candidate_id,
+        receipt: voteData.receipt,
+        vote_id: voteData.vote_id
+      });
+      
+      // Store the audit event in MongoDB
+      await AuditEventModel.create(auditEvent);
+
       logger.info(`Vote record saved to MongoDB from event with ID ${voteData.vote_id}`);
     } catch (error) {
       logger.error(`Failed to process vote event: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Handle tally computed event
+   * @param tallyData The tally data from the event
+   */
+  private async handleTallyComputed(tallyData: any): Promise<void> {
+    const electionId = tallyData.electionId || tallyData.election_id;
+    logger.info(`Tally computed for election ${electionId}`);
+    
+    try {
+      // Create audit event for tally computation
+      const auditEvent = createAuditEvent('tally_computed', {
+        election_id: electionId,
+        timestamp: tallyData.timestamp,
+        computed_by: tallyData.userId || 'system'
+      });
+      
+      // Store the audit event in MongoDB
+      await AuditEventModel.create(auditEvent);
+      
+      logger.info(`Tally computation audit event recorded for ${electionId}`);
+    } catch (error) {
+      logger.error(`Failed to record tally computation audit event: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Handle user registered event
+   * @param userData The user data from the event
+   */
+  private async handleUserRegistered(userData: any): Promise<void> {
+    logger.info(`User registered: ${userData.userId} with role ${userData.role}`);
+    
+    try {
+      // Create audit event for user registration
+      const auditEvent = createAuditEvent('user_registered', {
+        user_id: userData.userId,
+        governorate: userData.governorate,
+        role: userData.role,
+        timestamp: userData.timestamp || new Date().toISOString()
+      });
+      
+      // Store the audit event in MongoDB
+      await AuditEventModel.create(auditEvent);
+      
+      logger.info(`User registration audit event recorded for ${userData.userId}`);
+    } catch (error) {
+      logger.error(`Failed to record user registration audit event: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Handle user status updated event
+   * @param userStatusData The user status data from the event
+   */
+  private async handleUserStatusUpdated(userStatusData: any): Promise<void> {
+    logger.info(`User status updated: ${userStatusData.user_id} to ${userStatusData.status}`);
+    
+    try {
+      // Create audit event for user status update
+      const auditEvent = createAuditEvent('user_status_updated', {
+        user_id: userStatusData.user_id,
+        status: userStatusData.status,
+        reason: userStatusData.reason || 'Not specified',
+        updated_by: userStatusData.updated_by || 'system',
+        timestamp: userStatusData.timestamp || new Date().toISOString()
+      });
+      
+      // Store the audit event in MongoDB
+      await AuditEventModel.create(auditEvent);
+      
+      logger.info(`User status update audit event recorded for ${userStatusData.userId}`);
+    } catch (error) {
+      logger.error(`Failed to record user status update audit event: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

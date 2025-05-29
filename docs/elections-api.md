@@ -153,3 +153,30 @@ Response:
     "election_id": "string"
 }
 ```
+
+## `GET /elections/:election_id/tally`
+
+// real-time tally of votes for a given election, including the number of votes each candidate has received and the total number of votes cast. This endpoint is used to provide transparency and real-time updates during the election period.
+
+authorized roles: election commission, auditor
+
+Response:
+
+```json
+{
+    "election_id": "string",
+    "tally": [
+        {
+            "candidate_id": "string",
+            "votes": 500
+        },
+        {
+            "candidate_id": "string",
+            "votes": 300
+        }
+    ],
+    "total_votes": 1000,
+    "last_updated": "2023-10-01T00:00:00Z"
+}
+```
+

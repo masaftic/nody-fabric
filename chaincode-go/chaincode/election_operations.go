@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
 
@@ -63,7 +62,7 @@ type ElectionInput struct {
 	StartTime            string      `json:"start_time"`
 	EndTime              string      `json:"end_time"`
 	EligibleGovernorates []string    `json:"eligible_governorates"`
-	ElectionImage        string      `json:"election_image,omitempty"`
+	ElectionImage        string      `json:"election_image"`
 }
 
 // CreateElection creates a new election from JSON input (admin only)
@@ -135,11 +134,11 @@ func (s *VotingContract) CreateElection(ctx contractapi.TransactionContextInterf
 }
 
 // ComputeVoteTally calculates tally on demand
-func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInterface, electionID string) error {
+func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInterface, tallyID string, electionID string) (*VoteTally, error) {
 	// First get the election to validate it exists and initialize tally
 	election, err := s.GetElection(ctx, electionID)
 	if err != nil {
-		return fmt.Errorf("failed to get election %s: %v", electionID, err)
+		return nil, fmt.Errorf("failed to get election %s: %v", electionID, err)
 	}
 
 	// Initialize tally with 0 for all candidates
@@ -151,7 +150,7 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 	// Get all votes using range query with prefix
 	iterator, err := ctx.GetStub().GetStateByRange(votePrefix, votePrefix+"}")
 	if err != nil {
-		return fmt.Errorf("failed to get votes: %v", err)
+		return nil, fmt.Errorf("failed to get votes: %v", err)
 	}
 	defer iterator.Close()
 
@@ -159,13 +158,13 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 	for iterator.HasNext() {
 		queryResult, err := iterator.Next()
 		if err != nil {
-			return fmt.Errorf("failed to get next vote: %v", err)
+			return nil, fmt.Errorf("failed to get next vote: %v", err)
 		}
 
 		var vote Vote
 		err = json.Unmarshal(queryResult.Value, &vote)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal vote: %v", err)
+			return nil, fmt.Errorf("failed to unmarshal vote: %v", err)
 		}
 
 		// Only count votes for the specified election
@@ -177,7 +176,7 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 			}
 			isValidCandidate := slices.Contains(candidateIDs, vote.CandidateID)
 			if !isValidCandidate {
-				return fmt.Errorf("invalid candidate ID found in vote: %s", vote.CandidateID)
+				return nil, fmt.Errorf("invalid candidate ID found in vote: %s", vote.CandidateID)
 			}
 			tally[vote.CandidateID]++
 		}
@@ -186,12 +185,12 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 	// Get the client identity ID
 	clientID, err := getUserId(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get client identity: %v", err)
+		return nil, fmt.Errorf("failed to get client identity: %v", err)
 	}
 
 	// Create a VoteTally structure to save the results
 	voteTally := VoteTally{
-		ID:         uuid.NewString(),
+		ID:         tallyID,
 		UserID:     clientID,
 		ElectionID: electionID,
 		Tallies:    tally,
@@ -206,12 +205,12 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 	// Save tally to state
 	tallyJSON, err := json.Marshal(voteTally)
 	if err != nil {
-		return fmt.Errorf("failed to marshal vote tally: %v", err)
+		return nil, fmt.Errorf("failed to marshal vote tally: %v", err)
 	}
 
 	err = ctx.GetStub().PutState(tallyPrefix+electionID, tallyJSON)
 	if err != nil {
-		return fmt.Errorf("failed to save vote tally: %v", err)
+		return nil, fmt.Errorf("failed to save vote tally: %v", err)
 	}
 
 	// Emit an event with the election ID for the tally computation
@@ -220,21 +219,26 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 		"timestamp":  voteTally.CreatedAt,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal tally event payload: %v", err)
+		return nil, fmt.Errorf("failed to marshal tally event payload: %v", err)
 	}
 
 	err = ctx.GetStub().SetEvent("tally_computed", tallyEventPayload)
 	if err != nil {
-		return fmt.Errorf("failed to emit tally_computed event: %v", err)
+		return nil, fmt.Errorf("failed to emit tally_computed event: %v", err)
 	}
 
 	// Save updated election
 	electionJSON, err := json.Marshal(election)
 	if err != nil {
-		return fmt.Errorf("failed to marshal updated election: %v", err)
+		return nil, fmt.Errorf("failed to marshal updated election: %v", err)
 	}
 
-	return ctx.GetStub().PutState(tallyPrefix+electionID, electionJSON)
+	err = ctx.GetStub().PutState(tallyPrefix+electionID, electionJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save updated election: %v", err)
+	}
+
+	return &voteTally, nil
 }
 
 // ClearElections removes all elections from the ledger - restricted to admins only

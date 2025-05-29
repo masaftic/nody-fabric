@@ -2,13 +2,16 @@ import { Contract } from '@hyperledger/fabric-gateway';
 import { logger } from '../logger';
 import {
     Election,
-    CreateElectionRequest
+    CreateElectionRequest,
+    VoteTally,
+    BlockchainVoteTally
 } from '../models/election.model';
 import { 
     BaseRepository,
     ElectionRepository,
     UserRepository,
-    VoteRepository
+    VoteRepository,
+    AuditRepository
 } from './repositories';
 import { UserRole } from '../models/user.model';
 
@@ -21,12 +24,14 @@ export class BlockChainRepository {
     private electionRepo: ElectionRepository;
     private userRepo: UserRepository;
     private voteRepo: VoteRepository;
+    private auditRepo: AuditRepository;
 
     constructor(contract: Contract) {
         this.baseRepo = new BaseRepository(contract);
         this.electionRepo = new ElectionRepository(contract);
         this.userRepo = new UserRepository(contract);
         this.voteRepo = new VoteRepository(contract);
+        this.auditRepo = new AuditRepository(contract);
     }
 
     /**
@@ -69,8 +74,8 @@ export class BlockChainRepository {
         return this.electionRepo.createElection(request);
     }
 
-    async computeVoteTally(electionID: string): Promise<void> {
-        return this.electionRepo.computeVoteTally(electionID);
+    async computeVoteTally(tallyId: string, electionID: string): Promise<BlockchainVoteTally> {
+        return this.electionRepo.computeVoteTally(tallyId, electionID);
     }
 
     async clearElections(): Promise<void> {
@@ -94,5 +99,16 @@ export class BlockChainRepository {
 
     async getAllVotes(): Promise<any[]> {
         return this.voteRepo.getAllVotes();
+    }
+
+    /**
+     * Audit Repository Methods
+     */
+    async getUserRevocations(): Promise<any[]> {
+        return this.auditRepo.getUserRevocations();
+    }
+    
+    async getAuditVoteTally(electionId: string): Promise<void> {
+        return this.auditRepo.computeVoteTally(electionId);
     }
 }

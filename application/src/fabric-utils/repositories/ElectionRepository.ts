@@ -3,7 +3,9 @@ import { logger } from '../../logger';
 import {
     Candidate,
     Election,
-    CreateElectionRequest
+    CreateElectionRequest,
+    VoteTally,
+    BlockchainVoteTally
 } from '../../models/election.model';
 import crypto from 'crypto';
 import { BaseRepository } from './BaseRepository';
@@ -109,10 +111,13 @@ export class ElectionRepository extends BaseRepository {
     /**
      * Compute the vote tally for an election
      */
-    async computeVoteTally(electionID: string): Promise<void> {
+    async computeVoteTally(tallyID: string, electionID: string): Promise<BlockchainVoteTally> {
         logger.info('Submit Transaction: computeVoteTally for election with ID %s', electionID);
-        await this.contract.submitTransaction('ComputeVoteTally', electionID);
+        const resultBytes = await this.contract.submitTransaction('ComputeVoteTally', tallyID, electionID);
+        const resultJson = new TextDecoder().decode(resultBytes);
+        const tally = JSON.parse(resultJson) as BlockchainVoteTally;
         logger.info('Computed Vote tally for election: "%s"', electionID);
+        return tally;
     }
 
     /**

@@ -6,6 +6,7 @@ import { logger } from '../../logger';
  */
 export class BaseRepository {
     protected contract: Contract;
+    protected utf8Decoder = new TextDecoder();
 
     constructor(contract: Contract) {
         this.contract = contract;
@@ -17,6 +18,9 @@ export class BaseRepository {
     async getWorldState(): Promise<any> {
         const resultBytes = await this.contract.evaluateTransaction('GetWorldState');
         const resultJson = new TextDecoder().decode(resultBytes);
+        if (resultJson === '') {
+            return {};
+        }
         const result: unknown = JSON.parse(resultJson);
         logger.info('Result: %o', result);
         return result;

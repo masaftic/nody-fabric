@@ -11,7 +11,7 @@ import (
 
 // IsUserAdmin checks if the calling user is an admin
 func (s *VotingContract) IsUserAdmin(ctx contractapi.TransactionContextInterface) (bool, error) {
-	id, err := extractCN(ctx)
+	id, err := getUserId(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get client identity: %v", err)
 	}
@@ -46,7 +46,7 @@ func (s *VotingContract) ensureAdmin(ctx contractapi.TransactionContextInterface
 }
 
 // Helper function to extract CN value from client identity
-func extractCN(ctx contractapi.TransactionContextInterface) (string, error) {
+func getUserId(ctx contractapi.TransactionContextInterface) (string, error) {
 	// Get the full identity string
 	identity, err := ctx.GetClientIdentity().GetID()
 	if err != nil {

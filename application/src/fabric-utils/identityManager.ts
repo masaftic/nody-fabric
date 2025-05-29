@@ -1,6 +1,7 @@
-import FabricCAServices, { IEnrollResponse } from 'fabric-ca-client';
+import FabricCAServices, { IdentityService, IEnrollResponse, IIdentityRequest, IRevokeRequest } from 'fabric-ca-client';
 import { IEnrollmentRequest, IRegisterRequest } from 'fabric-ca-client';
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as path from 'path';
 import { User, Utils } from 'fabric-common';
 import { adminWalletPath, caURL, tlsCertPath, usersWalletPath, walletPath } from './config';
@@ -14,8 +15,9 @@ class IdentityManagerError extends Error {
 
 export class IdentityManager {
     private ca: FabricCAServices;
+    private identityService: IdentityService;
     private caUrl: string = caURL; 
-    private tlsCert: string = tlsCertPath;
+    private tlsCert: string = fsSync.readFileSync(tlsCertPath).toString();
 
     constructor() {
         try {
@@ -25,10 +27,18 @@ export class IdentityManager {
             };
 
             this.ca = new FabricCAServices(this.caUrl, options);
+            this.identityService = this.ca.newIdentityService();
         } catch (error) {
             throw new IdentityManagerError('Failed to initialize IdentityManager', error as Error);
         }
     }
+
+    async getUser(userId: string): Promise<any> {
+        const admin = await this.enrollAdmin();
+        const result = await this.identityService.getOne(userId, admin);
+        console.log(JSON.stringify(result));
+    }
+
 
     async enrollAdmin(): Promise<User> {
         const adminCertPath = path.join(adminWalletPath, 'cert.pem');
@@ -115,7 +125,7 @@ export class IdentityManager {
 
             return adminIdentity;
         } catch (error) {
-            throw new IdentityManagerError('Failed to enroll new admin', error as Error);
+            throw new IdentityManagerError('Failed to enroll new admin' + JSON.stringify(error), error as Error);
         }
     }
 
@@ -132,7 +142,7 @@ export class IdentityManager {
 
             const registerRequest: IRegisterRequest = {
                 enrollmentID: userId,
-                enrollmentSecret: '',
+                enrollmentSecret: userId, // TODO: what is a good secret here?
                 role: 'client',
                 affiliation: userAffiliation,
                 maxEnrollments: -1,
@@ -153,10 +163,10 @@ export class IdentityManager {
         }
     }
 
-    async enrollUser(userId: string, userSecret: string): Promise<IEnrollResponse> {
+    async enrollUser(userId: string, secret?: string): Promise<IEnrollResponse> {
         const enrollmentRequest: IEnrollmentRequest = {
             enrollmentID: userId,
-            enrollmentSecret: userSecret,
+            enrollmentSecret: secret || userId,  // Use provided secret or default to userId
             subject: `CN=${userId},OU=client`,
         };
 
@@ -228,6 +238,79 @@ export class IdentityManager {
         } catch (error) {
             throw new IdentityManagerError(
                 `Failed to save certificates for ${userId}`,
+                error as Error
+            );
+        }
+    }
+
+    /**
+     * Revoke a user's certificate
+     * @param adminIdentity The admin user to perform the revocation
+     * @param userId The user ID to revoke
+     * @param reason The reason for revocation
+     * @returns true if the revocation was successful
+     */
+    async revokeUserCertificate(
+        adminIdentity: User,
+        userId: string,
+        reason: string
+    ): Promise<boolean> {
+        try {
+            if (!adminIdentity) {
+                throw new IdentityManagerError('Admin identity is required for certificate revocation');
+            }
+
+            // Prepare the revocation request
+            const request: IRevokeRequest = {
+                enrollmentID: userId,
+                reason: reason || 'User certificate revoked',
+                // We can optionally add more parameters:
+                // caname: 'ca.org1.example.com', // If using specific CA name
+                // aki: 'Authority Key Identifier', // If known
+                // serial: 'Serial Number', // If known
+                // revoke_registrar: false, // Do we want to revoke the registrar identity too?
+            };
+
+            // Perform the revocation
+            await this.ca.revoke(request, adminIdentity);
+            console.log(`Successfully revoked certificate for user ${userId}`);
+
+            // Delete the user's certificate files
+            try {
+                const userCertsDir = path.join(usersWalletPath, userId);
+                await fs.rm(userCertsDir, { recursive: true, force: true });
+                console.log(`Removed certificate files for user ${userId}`);
+            } catch (fileError) {
+                // Just log the error but don't fail the operation
+                console.warn(`Could not remove certificate files for ${userId}: ${fileError}`);
+            }
+
+            return true;
+        } catch (error) {
+            console.error(`Error revoking certificate for user ${userId}:`, error);
+            throw new IdentityManagerError(
+                `Failed to revoke certificate for user ${userId}`,
+                error as Error
+            );
+        }
+    }
+
+    /**
+     * Get the revocation list (CRL) from the CA
+     * @param adminIdentity The admin user to fetch the revocation list
+     * @returns The certificate revocation list
+     */
+    async getCertificateRevocationList(adminIdentity: User): Promise<string> {
+        try {
+            if (!adminIdentity) {
+                throw new IdentityManagerError('Admin identity is required to get CRL');
+            }
+
+            const crl = await this.ca.generateCRL({}, adminIdentity);
+            return crl;
+        } catch (error) {
+            throw new IdentityManagerError(
+                'Failed to get certificate revocation list',
                 error as Error
             );
         }

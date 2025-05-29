@@ -22,10 +22,28 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
         return;
     }
 
-    const identityManager = new IdentityManager();
-    const user_id = crypto.randomUUID(); // voterId
-
     try {
+        // Check if national ID is already in use
+        const isNationalIdInUse = await userService.isNationalIdInUse(req.body.national_id);
+        if (isNationalIdInUse) {
+            res.status(StatusCodes.CONFLICT).json({
+                message: 'National ID already registered'
+            });
+            return;
+        }
+        
+        // Check if phone number is already in use
+        const isPhoneInUse = await userService.isPhoneNumberInUse(req.body.phone);
+        if (isPhoneInUse) {
+            res.status(StatusCodes.CONFLICT).json({
+                message: 'Phone number already registered'
+            });
+            return;
+        }
+        
+        const identityManager = new IdentityManager();
+        const user_id = crypto.randomUUID(); // voterId
+
         // Default role is 'voter'
         let role: UserRole = UserRole.Voter;
 
@@ -46,7 +64,7 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
         }
 
         const admin = await identityManager.enrollAdmin();
-        const secret = await identityManager.registerUser(admin, user_id, '', role);
+        const secret = await identityManager.registerUser(admin, user_id, '', role.toString());
 
         const userEnrollment = await identityManager.enrollUser(user_id, secret);
 
@@ -65,7 +83,7 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
 
         await withFabricAdminConnection(async (contract) => {
             const blockchainRepo = new BlockChainRepository(contract);
-            await blockchainRepo.registerUser(user_id, req.body.governorate);
+            await blockchainRepo.registerUser(user_id, req.body.governorate, role);
         });
 
         // Generate JWT token
@@ -156,18 +174,8 @@ export async function login(req: Request, res: Response) {
     if (!phoneNumber || !verifyPhoneNumber(phoneNumber))
         throw new BadRequestError("InValid Phone Number");
 
-    // Since phone numbers are hashed in the database, we need to check each user
-    const users = await UserModel.find({});
-    let matchedUser = null;
-
-    // Find the user whose hashed phone matches the provided phone
-    for (const user of users) {
-        const isMatch = await user.comparePhoneNumber(phoneNumber);
-        if (isMatch) {
-            matchedUser = user;
-            break;
-        }
-    }
+    // Use the service method to find a user by phone number
+    const matchedUser = await userService.findUserByPhone(phoneNumber);
 
     if (!matchedUser) {
         res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });

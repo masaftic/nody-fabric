@@ -33,7 +33,7 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 	}
 
 	// Get voter ID by extracting CN from client identity
-	voterId, err := extractCN(ctx)
+	voterId, err := getUserId(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get voter ID: %v", err)
 	}

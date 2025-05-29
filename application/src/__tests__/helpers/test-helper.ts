@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { IdentityManager } from '../../fabric-utils/identityManager';
-import UserModel from '../../models/user.model';
+import UserModel, { UserRole } from '../../models/user.model';
 import { withFabricAdminConnection } from '../../fabric-utils/fabric';
 import { BlockChainRepository } from '../../fabric-utils/BlockChainRepository';
 import { CreateElectionRequest } from '../../models/election.model';
@@ -42,7 +42,7 @@ export class TestHelper {
       // Register user in blockchain
       await withFabricAdminConnection(async (contract) => {
         const blockchainRepo = new BlockChainRepository(contract);
-        await blockchainRepo.registerUser(userId, governorate);
+        await blockchainRepo.registerUser(userId, governorate, UserRole.Voter);
       });
 
       return { userId, nationalId, phone, governorate };

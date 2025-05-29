@@ -46,7 +46,7 @@ type User struct {
 	ID               string   `json:"id"`
 	Governorate      string   `json:"governorate"`
 	VotedElectionIds []string `json:"voted_election_ids"` // Track which elections this user has voted in
-	Role             string   `json:"role"`               // e.g., "voter", "admin", "auditor"
+	Role             string   `json:"role"`               // e.g., "voter", "election_commission", "auditor"
 	Status           string   `json:"status"`             // e.g., "active", "suspended"
 }
 

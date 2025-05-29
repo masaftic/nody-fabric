@@ -9,7 +9,6 @@ Response:
 ```json
 {
     "certificate": "string", // PEM encoded certificate
-    "public_key": "string" // PEM encoded public key
 }
 ```
 
@@ -91,12 +90,14 @@ Response:
     {
         "user_id": "string",
         "reason": "string",
-        "timestamp": "2023-10-01T00:00:00Z"
+        "timestamp": "2023-10-01T00:00:00Z",
+        "revoked_by": "string" // user_id of the person who revoked
     },
     {
         "user_id": "string",
         "reason": "string",
-        "timestamp": "2023-10-02T00:00:00Z"
+        "timestamp": "2023-10-02T00:00:00Z",
+        "revoked_by": "string" // user_id of the person who revoked
     }
 ]
 ```

@@ -11,10 +11,18 @@ import connectDb, { isDbConnected } from './config/connectToDbAtlas';
 import { initFabricEventService } from './service/fabric-event.service';
 import { initSocketIOService } from './service/socket-io.service';
 import { uploadsRouter } from './routes/uploads.route';
+import { usersRouter } from './routes/users.route';
 
 export const createServerApp = async () => {
     const app = express();
     const httpServer = createServer(app);
+
+    // allow cors
+    app.use((req: Request, res: Response, next: NextFunction) => {
+        res.header("Access-Control-Allow-Origin", "*");
+        res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+        next();
+    });
 
     // Initialize Socket.IO for remote signing
     const io = initSocketIOService(httpServer);
@@ -78,6 +86,7 @@ export const createServerApp = async () => {
     }
 
     app.use("/api/v1/auth", authRouter);
+    app.use("/api/v1/users", usersRouter); 
     app.use("/api/v1/votes", votesRouter);
     app.use("/api/v1/elections", electionRouter);
     app.use("/api/v1/ledger", ledgerRouter);

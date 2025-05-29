@@ -29,24 +29,18 @@ import { StatusCodes } from "http-status-codes";
 // }
 
 
-// export async function getWorldState(req: Request, res: Response) {
-//     // Get userId from JWT token instead of request body
-//     if (!req.user?.user_id) {
-//         res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Authentication required' });
-//         return;
-//     }
+export async function getWorldState(req: Request, res: Response) {
+    // Get userId from JWT token instead of request body
+    if (!req.user?.user_id) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Authentication required' });
+        return;
+    }
 
-//     // This endpoint should only be accessible to admin or auditor roles
-//     if (req.user.role !== 'admin' && req.user.role !== 'auditor') {
-//         res.status(StatusCodes.FORBIDDEN).json({ message: 'Insufficient permissions' });
-//         return;
-//     }
+    const result = await withFabricAdminConnection((contract) => {
+        const blockchainRepo = new BlockChainRepository(contract);
+        return blockchainRepo.getWorldState();
+    });
 
-//     const result = await withFabricAdminConnection((contract) => {
-//         const blockchainRepo = new BlockChainRepository(contract);
-//         return blockchainRepo.getWorldState();
-//     });
-
-//     res.status(StatusCodes.OK).json(result);
-//     return;
-// }
+    res.status(StatusCodes.OK).json(result);
+    return;
+}

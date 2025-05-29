@@ -184,7 +184,7 @@ func (s *VotingContract) ComputeVoteTally(ctx contractapi.TransactionContextInte
 	}
 
 	// Get the client identity ID
-	clientID, err := extractCN(ctx)
+	clientID, err := getUserId(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get client identity: %v", err)
 	}

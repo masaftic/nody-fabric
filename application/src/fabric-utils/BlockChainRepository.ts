@@ -10,6 +10,7 @@ import {
     UserRepository,
     VoteRepository
 } from './repositories';
+import { UserRole } from '../models/user.model';
 
 /**
  * Repository for interacting with the voting contract on the blockchain
@@ -45,8 +46,8 @@ export class BlockChainRepository {
     /**
      * User Repository Methods
      */
-    async registerUser(userId: string, governorate: string): Promise<void> {
-        return this.userRepo.registerUser(userId, governorate);
+    async registerUser(userId: string, governorate: string, userRole: UserRole): Promise<void> {
+        return this.userRepo.registerUser(userId, governorate, userRole);
     }
 
     /**

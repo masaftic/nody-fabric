@@ -37,7 +37,11 @@ authorized roles: election commission, auditor, voter
 query parameters:
 
 - `status` (optional): Filter elections by status (e.g., active, inactive)
+   status can be: scheduled, live, ended, published, canceled
 - `governorate` (optional): Filter elections by eligible governorate
+    "القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "البحر الأحمر", "البحيرة", "الفيوم", "الغربية", "الإسماعيلية", "المنوفية", "المنيا", "القليوبية", "الوادي الجديد", "السويس", "أسوان", "أسيوط", "بني سويف", "بورسعيد", "دمياط", "الشرقية", "جنوب سيناء", "كفر الشيخ", "مطروح", "الأقصر", "قنا", "شمال سيناء", "سوهاج",
+- `start_time` (optional): Filter elections starting after a specific date
+- `end_time` (optional): Filter elections ending before a specific date
 
 Response:
 
@@ -158,24 +162,29 @@ Response:
 
 // real-time tally of votes for a given election, including the number of votes each candidate has received and the total number of votes cast. This endpoint is used to provide transparency and real-time updates during the election period.
 
-authorized roles: election commission, auditor
+authorized roles: election commission, auditor, and voter when the election is published
 
 Response:
 
 ```json
 {
     "election_id": "string",
-    "tally": [
+    "election_name": "string",
+    "total_votes": 1000,
+    "candidates": [
         {
             "candidate_id": "string",
+            "name": "string",
+            "party": "string",
             "votes": 500
         },
         {
             "candidate_id": "string",
+            "name": "string",
+            "party": "string",
             "votes": 300
         }
     ],
-    "total_votes": 1000,
     "last_updated": "2023-10-01T00:00:00Z"
 }
 ```

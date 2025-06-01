@@ -81,7 +81,7 @@ export class TestHelper {
       ],
       start_time: now.toISOString(),
       end_time: tomorrow.toISOString(),
-      eligible_governorates: ['Cairo', 'Alexandria'],
+      eligible_governorates: ['أسوان', 'قنا', 'الأقصر'], // Example governorates
       election_image: 'election_image.png', // URL to election image
     };
   }

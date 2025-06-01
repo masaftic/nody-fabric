@@ -1,7 +1,46 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 // Enums for reusable constants
-export type ElectionStatus = 'active' | 'inactive' | 'completed';
+
+export const Governorates = [
+  "القاهرة",
+  "الجيزة",
+  "الإسكندرية",
+  "الدقهلية",
+  "البحر الأحمر",
+  "البحيرة",
+  "الفيوم",
+  "الغربية",
+  "الإسماعيلية",
+  "المنوفية",
+  "المنيا",
+  "القليوبية",
+  "الوادي الجديد",
+  "السويس",
+  "أسوان",
+  "أسيوط",
+  "بني سويف",
+  "بورسعيد",
+  "دمياط",
+  "الشرقية",
+  "جنوب سيناء",
+  "كفر الشيخ",
+  "مطروح",
+  "الأقصر",
+  "قنا",
+  "شمال سيناء",
+  "سوهاج",
+] as const;
+
+export type Governorate = (typeof Governorates)[number];
+
+export enum ElectionStatus {
+  Scheduled = 'scheduled',
+  Live = 'live',
+  Ended = 'ended',
+  Published = 'published',
+  Cancelled = 'cancelled',
+}
 
 // Candidate model
 export interface Candidate {
@@ -21,9 +60,8 @@ export interface Election {
   start_time: string;
   end_time: string;
   status: ElectionStatus;
-  eligible_governorates: string[];
+  eligible_governorates: Governorate[];
   election_image: string; // URL to election image
-  last_tally_time?: string;
 }
 
 // Request/Response models - simplified
@@ -33,7 +71,7 @@ export interface CreateElectionRequest {
   candidates: Omit<Candidate, 'candidate_id'>[];
   start_time: string;
   end_time: string;
-  eligible_governorates: string[];
+  eligible_governorates: Governorate[];
   election_image: string; // URL
 }
 
@@ -78,7 +116,7 @@ export interface VoteTally {
 // Original blockchain VoteTally (renamed to avoid conflicts)
 export interface BlockchainVoteTally {
   id: string;
-  user_id: string;
+  user_id: string; // user who invoked to compute the tally
   election_id: string;
   tallies: Map<string, number>;
   created_at: Date;

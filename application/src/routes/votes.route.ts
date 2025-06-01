@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getUserVote, getAllVotes, userVote, getUserVotes, getVoteTally, verifyVote, submitVoterFeedback, getVoteDetailsByReceipt } from "../controller/vote.controller";
+import { getUserVote, getAllVotes, userVote, getUserVotes, verifyVote, submitVoterFeedback, getVoteDetailsByReceipt } from "../controller/vote.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { UserRole } from "../models/user.model";
 
@@ -26,8 +26,6 @@ router.get("/details/:receipt", authenticate, getVoteDetailsByReceipt);
 router.get("/user/:userId", authenticate, authorize([UserRole.Auditor, UserRole.ElectionCommission]), getUserVotes)
 router.get("/:id", authenticate, authorize([UserRole.Auditor, UserRole.ElectionCommission]), getUserVote)
 
-// Get vote tally for an election
-router.get("/tally/:electionId", authenticate, getVoteTally);
 
 export {
     router as votesRouter

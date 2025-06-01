@@ -28,7 +28,6 @@ type Election struct {
 	EndTime              string      `json:"end_time"`
 	EligibleGovernorates []string    `json:"eligible_governorates"`
 	Status               string      `json:"status"`
-	LastTallyTime        string      `json:"last_tally_time,omitempty"`
 	ElectionImage        string      `json:"election_image"`
 }
 

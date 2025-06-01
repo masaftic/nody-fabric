@@ -28,9 +28,10 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 		return "", err
 	}
 
-	if election.Status != "active" {
-		return "", fmt.Errorf("the election %s is not active", electionID)
-	}
+	// TODO: Check if the election is live. commented until cron jobs.
+	// if election.Status != "live" {
+	// 	return "", fmt.Errorf("the election %s is not live", electionID)
+	// }
 
 	// Get voter ID by extracting CN from client identity
 	voterId, err := getUserId(ctx)
@@ -173,31 +174,3 @@ func (s *VotingContract) GetAllVotes(ctx contractapi.TransactionContextInterface
 
 	return votes, nil
 }
-
-// ClearVotes removes all votes from the ledger - restricted to admins only
-// func (s *VotingContract) ClearVotes(ctx contractapi.TransactionContextInterface) error {
-// 	// Ensure admin privileges
-// 	if err := s.ensureAdmin(ctx); err != nil {
-// 		return err
-// 	}
-
-// 	iterator, err := ctx.GetStub().GetStateByRange(votePrefix, votePrefix+"}")
-// 	if err != nil {
-// 		return fmt.Errorf("failed to get votes: %v", err)
-// 	}
-// 	defer iterator.Close()
-
-// 	for iterator.HasNext() {
-// 		queryResult, err := iterator.Next()
-// 		if err != nil {
-// 			return fmt.Errorf("failed to get next vote: %v", err)
-// 		}
-
-// 		err = ctx.GetStub().DelState(queryResult.Key)
-// 		if err != nil {
-// 			return fmt.Errorf("failed to delete vote %s: %v", queryResult.Key, err)
-// 		}
-// 	}
-
-// 	return nil
-// }

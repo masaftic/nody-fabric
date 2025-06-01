@@ -51,7 +51,6 @@ func (s *VotingContract) InitLedger(ctx contractapi.TransactionContextInterface)
 			EndTime:              "2024-01-31T23:59:59Z",
 			EligibleGovernorates: []string{"Governorate1", "Governorate2"},
 			Status:               "active",
-			LastTallyTime:        "2024-02-01T00:00:00Z",
 		},
 	}
 

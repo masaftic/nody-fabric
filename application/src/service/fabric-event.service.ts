@@ -210,7 +210,7 @@ export class FabricEventService {
       ],
       start_time: new Date().toISOString(),
       end_time: new Date(Date.now() + 86400000).toISOString(), // 1 day later
-      eligible_governorates: ['Governorate1', 'Governorate B'],
+      eligible_governorates: ['البحر الأحمر', 'القاهرة', 'الإسكندرية'], // Example governorates
       election_image: 'election_image.png' // URL to election image
     };
 
@@ -360,7 +360,7 @@ export class FabricEventService {
       const auditEvent = createAuditEvent('tally_computed', {
         election_id: electionId,
         timestamp: tallyData.timestamp,
-        computed_by: tallyData.userId || 'system'
+        computed_by: tallyData.user_id || 'system'
       });
       
       // Store the audit event in MongoDB
@@ -377,12 +377,12 @@ export class FabricEventService {
    * @param userData The user data from the event
    */
   private async handleUserRegistered(userData: any): Promise<void> {
-    logger.info(`User registered: ${userData.userId} with role ${userData.role}`);
+    logger.info(`User registered: ${userData.user_id} with role ${userData.role}`);
     
     try {
       // Create audit event for user registration
       const auditEvent = createAuditEvent('user_registered', {
-        user_id: userData.userId,
+        user_id: userData.user_id,
         governorate: userData.governorate,
         role: userData.role,
         timestamp: userData.timestamp || new Date().toISOString()
@@ -391,7 +391,7 @@ export class FabricEventService {
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
       
-      logger.info(`User registration audit event recorded for ${userData.userId}`);
+      logger.info(`User registration audit event recorded for ${userData.user_id}`);
     } catch (error) {
       logger.error(`Failed to record user registration audit event: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -417,7 +417,7 @@ export class FabricEventService {
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
       
-      logger.info(`User status update audit event recorded for ${userStatusData.userId}`);
+      logger.info(`User status update audit event recorded for ${userStatusData.user_id}`);
     } catch (error) {
       logger.error(`Failed to record user status update audit event: ${error instanceof Error ? error.message : String(error)}`);
     }

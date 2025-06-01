@@ -4,12 +4,11 @@ import {
     getAllElections,
     // getElectionAnalytics, 
     createElection,
+    getVoteTally
 } from "../controller/election.controller";
 
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { UserRole } from "../models/user.model";
-import { getVoteTally } from "../controller/vote.controller";
-
 
 const router = Router();
 

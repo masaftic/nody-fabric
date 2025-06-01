@@ -1,4 +1,4 @@
-import { connect, Contract, Gateway, hash, Identity, Signer } from "@hyperledger/fabric-gateway";
+import { connect, Contract, EndorseError, Gateway, hash, Identity, Signer } from "@hyperledger/fabric-gateway";
 import * as grpc from '@grpc/grpc-js';
 import { adminWalletPath, mspId, peerEndpoint, peerHostAlias, tlsCertPath, usersWalletPath } from "./config";
 import * as fs from 'fs/promises';
@@ -70,7 +70,7 @@ async function requestRemoteSignature(userId: string, digest: Uint8Array): Promi
             reject(new Error('Socket service not available for remote signing'));
             return;
         }
-        
+
         // Check if there are any connected signing clients for this user
         if (!hasConnectedSigningClients(userId)) {
             reject(new Error(`No connected signing clients for user ${userId}`));
@@ -215,6 +215,13 @@ export async function withFabricAdminConnection<T>(
     try {
         const contract = gateway.getNetwork('mychannel').getContract('basic');
         return await callback(contract); // Execute the callback and return its result
+    } catch (error: any) {
+        if (error instanceof EndorseError) {
+            logger.error(`EndorseError: ${error.message}. Details: ${error.details.map(detail => `Address: ${detail.address}, Message: ${detail.message}`).join('; ')}`);
+        } else {
+            logger.error(`Error during transaction: ${error.message}`);
+        }
+        throw error;
     } finally {
         client.close();
         gateway.close();
@@ -230,7 +237,15 @@ export async function withFabricConnection<T>(
     try {
         const contract = gateway.getNetwork('mychannel').getContract('basic');
         return await callback(contract); // Execute the callback and return its result
-    } finally {
+    } catch (error: any) {
+        if (error instanceof EndorseError) {
+            logger.error(`EndorseError: ${error.message}. Details: ${error.details.map(detail => `Address: ${detail.address}, Message: ${detail.message}`).join('; ')}`);
+        } else {
+            logger.error(`Error during transaction: ${error.message}`);
+        }
+        throw error;
+    }
+    finally {
         client.close();
         gateway.close();
     }

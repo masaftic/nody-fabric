@@ -12,12 +12,20 @@ import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
 import { generateToken } from '../utils/jwt.utils';
 import crypto from 'crypto';
 import { invitationService } from "../service/invitation.service";
+import { Governorates } from "../models/election.model";
 
 
 async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response) {
     if (!req.body.national_id || !req.body.phone || !req.body.governorate) {
         res.status(StatusCodes.BAD_REQUEST).json({
             message: 'Missing required fields'
+        });
+        return;
+    }
+
+    if (Governorates.includes(req.body.governorate) === false) {
+        res.status(StatusCodes.BAD_REQUEST).json({
+            message: 'Invalid governorate'
         });
         return;
     }

@@ -5,7 +5,8 @@ import {
     Election,
     CreateElectionRequest,
     VoteTally,
-    BlockchainVoteTally
+    BlockchainVoteTally,
+    ElectionStatus
 } from '../../models/election.model';
 import crypto from 'crypto';
 import { BaseRepository } from './BaseRepository';
@@ -23,23 +24,17 @@ export class ElectionRepository extends BaseRepository {
      */
     async getElection(electionID: string): Promise<Election> {
         logger.info('Evaluate Transaction: GetElection, function returns the election with ID %s', electionID);
-
-        try {
-            // Get data from blockchain
-            const resultBytes = await this.contract.evaluateTransaction('GetElection', electionID);
-            const resultJson = new TextDecoder().decode(resultBytes);
-            if (!resultJson) {
-                logger.warn('No election found with ID %s', electionID);
-                throw new Error(`No election found with ID ${electionID}`);
-            }
-            const election = JSON.parse(resultJson) as Election;
-
-            logger.info('Election retrieved from blockchain: %s', election.name);
-            return election;
-        } catch (error) {
-            logger.error(`Error retrieving election: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
+        // Get data from blockchain
+        const resultBytes = await this.contract.evaluateTransaction('GetElection', electionID);
+        const resultJson = new TextDecoder().decode(resultBytes);
+        if (!resultJson) {
+            logger.warn('No election found with ID %s', electionID);
+            throw new Error(`No election found with ID ${electionID}`);
         }
+        const election = JSON.parse(resultJson) as Election;
+
+        logger.info('Election retrieved from blockchain: %s', election.name);
+        return election;
     }
 
     /**
@@ -48,20 +43,15 @@ export class ElectionRepository extends BaseRepository {
     async getAllElections(): Promise<Election[]> {
         logger.info('Evaluate Transaction: GetAllElections, function returns all elections');
 
-        try {
-            const resultBytes = await this.contract.evaluateTransaction('GetAllElections');
-            const resultJson = new TextDecoder().decode(resultBytes);
-            if (resultJson === '') {
-                return [];
-            }
-
-            const elections = JSON.parse(resultJson) as Election[];
-            logger.info(`Retrieved ${elections.length} elections from blockchain`);
-            return elections;
-        } catch (error) {
-            logger.error(`Error retrieving elections: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
+        const resultBytes = await this.contract.evaluateTransaction('GetAllElections');
+        const resultJson = new TextDecoder().decode(resultBytes);
+        if (resultJson === '') {
+            return [];
         }
+
+        const elections = JSON.parse(resultJson) as Election[];
+        logger.info(`Retrieved ${elections.length} elections from blockchain`);
+        return elections;
     }
 
     /**
@@ -89,13 +79,14 @@ export class ElectionRepository extends BaseRepository {
         }));
 
         // Prepare election object for blockchain
-        const election = {
+        const election: Election = {
             election_id: electionId,
             name: request.name,
             description: request.description,
             candidates: candidatesWithIds,
             start_time: request.start_time,
             end_time: request.end_time,
+            status: ElectionStatus.Scheduled, // Initial status
             eligible_governorates: request.eligible_governorates,
             election_image: request.election_image
         };

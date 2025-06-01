@@ -50,82 +50,47 @@ func (s *VotingContract) GetAllElections(ctx contractapi.TransactionContextInter
 		}
 		elections = append(elections, &election)
 	}
-	return elections, nil
-}
 
-// ElectionInput represents the JSON input for creating a new election
-type ElectionInput struct {
-	ID                   string      `json:"election_id"`
-	Name                 string      `json:"name"`
-	Description          string      `json:"description"`
-	Candidates           []Candidate `json:"candidates"`
-	StartTime            string      `json:"start_time"`
-	EndTime              string      `json:"end_time"`
-	EligibleGovernorates []string    `json:"eligible_governorates"`
-	ElectionImage        string      `json:"election_image"`
+	return elections, nil
 }
 
 // CreateElection creates a new election from JSON input (admin only)
 func (s *VotingContract) CreateElection(ctx contractapi.TransactionContextInterface, electionInputJSON string) error {
-
-	// Ensure admin privileges
-	// if err := s.ensureAdmin(ctx); err != nil {
-	// 	return err
-	// }
-
 	// Parse the JSON input
-	var input ElectionInput
+	var input Election
 	err := json.Unmarshal([]byte(electionInputJSON), &input)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal election input: %v", err)
 	}
 
 	// Validate required fields
-	if input.ID == "" || input.Name == "" || len(input.Candidates) == 0 ||
+	if input.ElectionID == "" || input.Name == "" || len(input.Candidates) == 0 ||
 		input.StartTime == "" || input.EndTime == "" {
 		return fmt.Errorf("missing required fields in election input")
 	}
 
 	// Check if election already exists
-	electionJSON, err := ctx.GetStub().GetState(electionPrefix + input.ID)
+	electionJSON, err := ctx.GetStub().GetState(electionPrefix + input.ElectionID)
 	if err != nil {
 		return fmt.Errorf("failed to read from world state: %v", err)
 	}
 	if electionJSON != nil {
-		return fmt.Errorf("election already exists with ID: %s", input.ID)
+		return fmt.Errorf("election already exists with Id: %s", input.ElectionID)
+	}
+
+	electionJSON, err = json.Marshal(input)
+	if err != nil {
+		return fmt.Errorf("failed to marshal election input: %v", err)
 	}
 
 	// Create the election directly with all the data from the input
-	election := Election{
-		ElectionID:           input.ID,
-		Name:                 input.Name,
-		Description:          input.Description,
-		Candidates:           input.Candidates,
-		StartTime:            input.StartTime,
-		EndTime:              input.EndTime,
-		EligibleGovernorates: input.EligibleGovernorates,
-		Status:               "active",
-		LastTallyTime:        time.Now().Format(time.RFC3339),
-		ElectionImage:        input.ElectionImage,
-	}
-
-	electionJSON, err = json.Marshal(election)
-	if err != nil {
-		return err
-	}
-
-	err = ctx.GetStub().PutState(electionPrefix+input.ID, electionJSON)
+	err = ctx.GetStub().PutState(electionPrefix+input.ElectionID, electionJSON)
 	if err != nil {
 		return err
 	}
 
 	// Emit event with entire election data for MongoDB sync
-	eventPayload, err := json.Marshal(election)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event payload: %v", err)
-	}
-
-	err = ctx.GetStub().SetEvent("election_created", eventPayload)
+	err = ctx.GetStub().SetEvent("election_created", electionJSON)
 	if err != nil {
 		return fmt.Errorf("failed to set event: %v", err)
 	}

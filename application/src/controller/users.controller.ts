@@ -13,7 +13,7 @@ import { UserRole } from "../models/user.model";
  * Get user by ID
  * Authorized roles: election_commission, auditor
  */
-export const getUserById = async (req: Request, res: Response): Promise<void> => {
+export async function getUserById(req: Request, res: Response): Promise<void> {
     const { user_id } = req.params;
 
     try {
@@ -39,13 +39,13 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
             message: 'Error retrieving user'
         });
     }
-};
+}
 
 /**
  * Get user certificate
  * Authorized roles: election_commission, auditor
  */
-export const getUserCertificate = async (req: Request, res: Response): Promise<void> => {
+export async function getUserCertificate(req: Request, res: Response): Promise<void> {
     const { user_id } = req.params;
 
     try {
@@ -67,13 +67,13 @@ export const getUserCertificate = async (req: Request, res: Response): Promise<v
             message: 'Error retrieving user certificate'
         });
     }
-};
+}
 
 /**
  * Get all users with optional filters
  * Authorized roles: election_commission, auditor
  */
-export const getUsers = async (req: Request, res: Response): Promise<void> => {
+export async function getUsers(req: Request, res: Response): Promise<void> {
     const { status, governorate, role } = req.query;
 
     // Validate query parameters
@@ -120,13 +120,13 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
             message: 'Error retrieving users'
         });
     }
-};
+}
 
 /**
  * Revoke user access
  * Authorized roles: election_commission, auditor
  */
-export const revokeUser = async (req: Request, res: Response): Promise<void> => {
+export async function revokeUser(req: Request, res: Response): Promise<void> {
     const { user_id } = req.params;
     const { reason } = req.body || {};
 
@@ -181,13 +181,13 @@ export const revokeUser = async (req: Request, res: Response): Promise<void> => 
             message: 'Error revoking user'
         });
     }
-};
+}
 
 /**
  * Get user revocations history
  * Authorized roles: election_commission, auditor
  */
-export const getUserRevocations = async (req: Request, res: Response) => {
+export async function getUserRevocations(req: Request, res: Response) {
     try {
         // Get revocation records from blockchain
         const revocations = await withFabricConnection(req.user!.user_id, async (contract) => {
@@ -196,7 +196,6 @@ export const getUserRevocations = async (req: Request, res: Response) => {
         });
 
         // Format the response
-
         // Additionally, get the CA certificate revocation list
         try {
             const identityManager = new IdentityManager();
@@ -219,4 +218,4 @@ export const getUserRevocations = async (req: Request, res: Response) => {
         });
         return;
     }
-};
+}

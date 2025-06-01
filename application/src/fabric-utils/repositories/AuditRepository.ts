@@ -1,4 +1,4 @@
-import { Contract } from '@hyperledger/fabric-gateway';
+import { Contract, EndorseError } from '@hyperledger/fabric-gateway';
 import { logger } from '../../logger';
 import { BaseRepository } from './BaseRepository';
 
@@ -15,14 +15,9 @@ export class AuditRepository extends BaseRepository {
    * @returns Array of user revocations
    */
   async getUserRevocations(): Promise<any[]> {
-    try {
-      const resultBytes = await this.contract.evaluateTransaction('GetUserRevocations');
-      const resultJson = this.utf8Decoder.decode(resultBytes);
-      return resultJson ? JSON.parse(resultJson) : [];
-    } catch (error) {
-      logger.error(`Error getting user revocations: ${error}`);
-      throw error;
-    }
+    const resultBytes = await this.contract.evaluateTransaction('GetUserRevocations');
+    const resultJson = this.utf8Decoder.decode(resultBytes);
+    return resultJson ? JSON.parse(resultJson) : [];
   }
 
   /**
@@ -31,13 +26,8 @@ export class AuditRepository extends BaseRepository {
    * @returns The computed tally or error
    */
   async computeVoteTally(electionId: string): Promise<void> {
-    try {
-      await this.contract.submitTransaction('ComputeVoteTally', electionId);
-      logger.info(`Successfully computed tally for election ${electionId}`);
-    } catch (error) {
-      logger.error(`Error computing tally for election ${electionId}: ${error}`);
-      throw error;
-    }
+    await this.contract.submitTransaction('ComputeVoteTally', electionId);
+    logger.info(`Successfully computed tally for election ${electionId}`);
   }
 
   /**
@@ -45,14 +35,9 @@ export class AuditRepository extends BaseRepository {
    * @returns Array of votes
    */
   async getAllVotes(): Promise<any[]> {
-    try {
-      const resultBytes = await this.contract.evaluateTransaction('GetAllVotes');
-      const resultJson = this.utf8Decoder.decode(resultBytes);
-      return resultJson ? JSON.parse(resultJson) : [];
-    } catch (error) {
-      logger.error(`Error getting all votes: ${error}`);
-      throw error;
-    }
+    const resultBytes = await this.contract.evaluateTransaction('GetAllVotes');
+    const resultJson = this.utf8Decoder.decode(resultBytes);
+    return resultJson ? JSON.parse(resultJson) : [];
   }
 
   /**
@@ -61,13 +46,8 @@ export class AuditRepository extends BaseRepository {
    * @returns The vote or null if not found
    */
   async getVote(voteId: string): Promise<any> {
-    try {
-      const resultBytes = await this.contract.evaluateTransaction('GetVote', voteId);
-      const resultJson = this.utf8Decoder.decode(resultBytes);
-      return resultJson ? JSON.parse(resultJson) : null;
-    } catch (error) {
-      logger.error(`Error getting vote ${voteId}: ${error}`);
-      throw error;
-    }
+    const resultBytes = await this.contract.evaluateTransaction('GetVote', voteId);
+    const resultJson = this.utf8Decoder.decode(resultBytes);
+    return resultJson ? JSON.parse(resultJson) : null;
   }
 }

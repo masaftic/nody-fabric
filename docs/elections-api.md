@@ -36,12 +36,10 @@ authorized roles: election commission, auditor, voter
 
 query parameters:
 
-- `status` (optional): Filter elections by status (e.g., active, inactive)
+- `status` (optional): Filter elections by status.
    status can be: scheduled, live, ended, published, canceled
 - `governorate` (optional): Filter elections by eligible governorate
     "القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "البحر الأحمر", "البحيرة", "الفيوم", "الغربية", "الإسماعيلية", "المنوفية", "المنيا", "القليوبية", "الوادي الجديد", "السويس", "أسوان", "أسيوط", "بني سويف", "بورسعيد", "دمياط", "الشرقية", "جنوب سيناء", "كفر الشيخ", "مطروح", "الأقصر", "قنا", "شمال سيناء", "سوهاج",
-- `start_time` (optional): Filter elections starting after a specific date
-- `end_time` (optional): Filter elections ending before a specific date
 
 Response:
 
@@ -53,7 +51,7 @@ Response:
         "description": "string",
         "start_time": "2023-10-01T00:00:00Z",
         "end_time": "2023-10-31T23:59:59Z",
-        "status": "active",
+        "status": "live",
         "election_image": "string", // URL
         "eligible_governorates": [
             "string"
@@ -65,7 +63,7 @@ Response:
         "description": "string",
         "start_time": "2023-10-01T00:00:00Z",
         "end_time": "2023-10-31T23:59:59Z",
-        "status": "inactive",
+        "status": "scheduled",
         "election_image": "string", // URL
         "eligible_governorates": [
             "string"

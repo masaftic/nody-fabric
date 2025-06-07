@@ -13,17 +13,14 @@ import { initSocketIOService } from './service/socket-io.service';
 import { uploadsRouter } from './routes/uploads.route';
 import { usersRouter } from './routes/users.route';
 import { auditRouter } from './routes/audits.route';
+import cors from 'cors';
 
 export const createServerApp = async () => {
     const app = express();
     const httpServer = createServer(app);
 
     // allow cors
-    app.use((req: Request, res: Response, next: NextFunction) => {
-        res.header("Access-Control-Allow-Origin", "*");
-        res.header("Access-Control-Allow-Headers", "*");
-        next();
-    });
+    app.use(cors());
 
     // Initialize Socket.IO for remote signing
     const io = initSocketIOService(httpServer);

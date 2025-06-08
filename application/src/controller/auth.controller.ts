@@ -178,12 +178,12 @@ export async function login(req: Request, res: Response) {
     // Temporarily using phone number for login.
     // Instead of a sign challenge with the private key of the user.
 
-    const { phoneNumber } = req.body;
-    if (!phoneNumber || !verifyPhoneNumber(phoneNumber))
+    const { phone } = req.body;
+    if (!phone || !verifyPhoneNumber(phone))
         throw new BadRequestError("InValid Phone Number");
 
     // Use the service method to find a user by phone number
-    const matchedUser = await userService.findUserByPhone(phoneNumber);
+    const matchedUser = await userService.findUserByPhone(phone);
 
     if (!matchedUser) {
         res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });

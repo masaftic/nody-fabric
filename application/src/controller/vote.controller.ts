@@ -9,11 +9,11 @@ import crypto from 'crypto';
 
 async function castVote(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-        const { electionId, candidateId } = req.body;
+        const { election_id, candidate_id } = req.body;
         // Get userId from JWT token
         const userId = req.user?.user_id;
         
-        if (!userId || !electionId || !candidateId) {
+        if (!userId || !election_id || !candidate_id) {
             res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
             return;
         }
@@ -22,7 +22,7 @@ async function castVote(req: Request, res: Response, next: NextFunction): Promis
             const voteId = crypto.randomUUID();
             const blockchainRepo = new BlockChainRepository(contract);
             // Call the CastVote function on the chaincode
-            return await blockchainRepo.castVote(voteId, electionId, candidateId);
+            return await blockchainRepo.castVote(voteId, election_id, candidate_id);
         });
 
         res.status(StatusCodes.OK).json({

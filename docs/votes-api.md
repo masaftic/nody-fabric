@@ -160,3 +160,20 @@ Response:
     "last_updated": "2023-10-01T00:00:00Z"
 }
 ```
+
+## GET `/votes/check/:userId/:electionId`
+
+authorized roles: voter (self), election commission, auditor
+
+Response:
+
+```json
+{
+    "success": true,
+    "message": "User has voted in this election", // or "User has not voted in this election"
+    "hasVoted": true, // or false
+    "election_id": "string",
+    "user_id": "string",
+    "receipt": "string" // only included if hasVoted is true
+}
+```

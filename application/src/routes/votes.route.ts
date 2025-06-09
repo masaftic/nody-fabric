@@ -1,5 +1,14 @@
 import { Router } from "express";
-import { getUserVote, getAllVotes, userVote, getUserVotes, verifyVote, submitVoterFeedback, getVoteDetailsByReceipt } from "../controller/vote.controller";
+import { 
+    getUserVote, 
+    getAllVotes, 
+    userVote, 
+    getUserVotes, 
+    verifyVote, 
+    submitVoterFeedback, 
+    getVoteDetailsByReceipt, 
+    checkUserVotedInElection 
+} from "../controller/vote.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { UserRole } from "../models/user.model";
 
@@ -19,8 +28,8 @@ router.get("/verify/:receipt", verifyVote);
 // Authenticated route for detailed vote information
 router.get("/details/:receipt", authenticate, getVoteDetailsByReceipt);
 
-// Authenticated route for detailed vote information
-router.get("/details/:receipt", authenticate, getVoteDetailsByReceipt);
+// Check if a user has voted in a specific election
+router.get("/check/:userId/:electionId", authenticate, checkUserVotedInElection);
 
 // Analytics route must come before path with parameters to avoid conflicts
 router.get("/user/:userId", authenticate, authorize([UserRole.Auditor, UserRole.ElectionCommission]), getUserVotes)

@@ -331,6 +331,58 @@ async function getVoteDetailsByReceipt(req: Request, res: Response): Promise<voi
     }
 }
 
+/**
+ * Check if a user has voted in a specific election
+ * This allows checking voting status for a specific election
+ */
+async function checkUserVotedInElection(req: Request, res: Response): Promise<void> {
+    const { userId, electionId } = req.params;
+    
+    if (!userId || !electionId) {
+        res.status(StatusCodes.BAD_REQUEST).json({ message: 'User ID and Election ID are required' });
+        return;
+    }
+
+    try {
+        // Check if authorized user is making the request
+        const requestingUserId = req.user?.user_id;
+        
+        // If user is not admin/auditor and trying to access someone else's data
+        if (userId !== requestingUserId && 
+            req.user?.role !== 'election_commission' && 
+            req.user?.role !== 'auditor') {
+            res.status(StatusCodes.FORBIDDEN).json({
+                success: false,
+                message: 'You are not authorized to view this information'
+            });
+            return;
+        }
+
+        // Find vote in MongoDB by voter_id and election_id
+        const vote = await VoteModel.findOne({ 
+            voter_id: userId, 
+            election_id: electionId 
+        });
+        
+        res.status(StatusCodes.OK).json({
+            success: true,
+            message: vote ? 'User has voted in this election' : 'User has not voted in this election',
+            hasVoted: !!vote,
+            election_id: electionId,
+            user_id: userId,
+            // Include receipt only if the vote exists
+            ...(vote && { receipt: vote.receipt })
+        });
+        
+    } catch (error) {
+        logger.error(`Error checking voting status: ${error instanceof Error ? error.message : String(error)}`);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: `Error checking voting status: ${error instanceof Error ? error.message : String(error)}`
+        });
+    }
+}
+
 
 export {
     castVote as userVote,
@@ -339,5 +391,6 @@ export {
     getUserVotes,
     verifyVote,
     submitVoterFeedback,
-    getVoteDetailsByReceipt
+    getVoteDetailsByReceipt,
+    checkUserVotedInElection
 }

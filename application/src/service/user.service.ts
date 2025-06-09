@@ -23,22 +23,10 @@ export class UserService {
    */
   async saveUser(userData: IUser): Promise<void> {
     try {
-      // Always use userId for lookups since it's not hashed
-      const existingUser = await UserModel.findOne({ userId: userData.userId });
-
-      if (existingUser) {
-        // Update the existing user - be careful with phone and nationalId
-        // which might be already hashed in the existing user
-        const updatedData = { ...userData };
-
-        Object.assign(existingUser, updatedData);
-        await existingUser.save();
-        logger.info(`User with ID ${userData.userId} updated in MongoDB`);
-      } else {
-        // Create a new user
-        await UserModel.create(userData);
-        logger.info(`User with ID ${userData.userId} created in MongoDB`);
-      }
+      // Simple direct save operation - MongoDB will handle unique constraint errors
+      // This eliminates the need for an extra findOne operation which improves performance
+      await userData.save();
+      logger.info(`User with ID ${userData.userId} saved in MongoDB`);
     } catch (error) {
       logger.error(`Error saving user to MongoDB: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
@@ -132,18 +120,14 @@ export class UserService {
    */
   async isNationalIdInUse(nationalId: string): Promise<boolean> {
     try {
-      // Since national IDs are hashed in the database, we need to check each user
-      const users = await UserModel.find({});
+      // Create the same hash that would be generated in pre-save
+      const uniqueHash = require('crypto').createHash('sha256')
+        .update(nationalId)
+        .digest('hex');
       
-      // Check if any user's hashed national ID matches the provided plain national ID
-      for (const user of users) {
-        const isMatch = await user.compareNationalId(nationalId);
-        if (isMatch) {
-          return true;
-        }
-      }
-      
-      return false;
+      // Do a direct lookup using the deterministic hash - much more efficient
+      const existingUser = await UserModel.findOne({ nationalIdUnique: uniqueHash });
+      return existingUser !== null;
     } catch (error) {
       logger.error(`Error checking national ID: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
@@ -157,17 +141,14 @@ export class UserService {
    */
   async findUserByPhone(phoneNumber: string): Promise<IUser | null> {
     try {
-      // Since phone numbers are hashed in the database, we need to check each user
-      const users = await UserModel.find({});
+      // Create the same hash that would be generated in pre-save
+      const uniqueHash = require('crypto').createHash('sha256')
+        .update(phoneNumber)
+        .digest('hex');
       
-      for (const user of users) {
-        const isMatch = await user.comparePhoneNumber(phoneNumber);
-        if (isMatch) {
-          return user;
-        }
-      }
-      
-      return null;
+      // Lookup directly using the deterministic hash - much more efficient
+      const user = await UserModel.findOne({ phoneUnique: uniqueHash });
+      return user;
     } catch (error) {
       logger.error(`Error finding user by phone: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
@@ -181,18 +162,14 @@ export class UserService {
    */
   async isPhoneNumberInUse(phone: string): Promise<boolean> {
     try {
-      // Since phone numbers are hashed in the database, we need to check each user
-      const users = await UserModel.find({});
+      // Create the same hash that would be generated in pre-save
+      const uniqueHash = require('crypto').createHash('sha256')
+        .update(phone)
+        .digest('hex');
       
-      // Check if any user's hashed phone matches the provided plain phone
-      for (const user of users) {
-        const isMatch = await user.comparePhoneNumber(phone);
-        if (isMatch) {
-          return true;
-        }
-      }
-      
-      return false;
+      // Do a direct lookup using the deterministic hash - much more efficient
+      const existingUser = await UserModel.findOne({ phoneUnique: uniqueHash });
+      return existingUser !== null;
     } catch (error) {
       logger.error(`Error checking phone number: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
@@ -206,17 +183,14 @@ export class UserService {
    */
   async findUserByNationalId(nationalId: string): Promise<IUser | null> {
     try {
-      // Since national IDs are hashed in the database, we need to check each user
-      const users = await UserModel.find({});
+      // Create the same hash that would be generated in pre-save
+      const uniqueHash = require('crypto').createHash('sha256')
+        .update(nationalId)
+        .digest('hex');
       
-      for (const user of users) {
-        const isMatch = await user.compareNationalId(nationalId);
-        if (isMatch) {
-          return user;
-        }
-      }
-      
-      return null;
+      // Lookup directly using the deterministic hash - much more efficient
+      const user = await UserModel.findOne({ nationalIdUnique: uniqueHash });
+      return user;
     } catch (error) {
       logger.error(`Error finding user by national ID: ${error instanceof Error ? error.message : String(error)}`);
       throw error;

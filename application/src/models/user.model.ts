@@ -13,6 +13,8 @@ export interface IUser extends Document {
     userId: string;
     nationalId: string;
     phone: string;
+    nationalIdUnique?: string; // Add field for unique hash
+    phoneUnique?: string;      // Add field for unique hash
     isVerified?: boolean;
     verifyCode?: string;
     verifyCodeExpireOn?: Date;
@@ -20,6 +22,8 @@ export interface IUser extends Document {
     governorate: Governorate;
     role: UserRole;
     status: "active" | "suspended";
+    birthdate?: Date;
+    age?: number;
     createdAt: Date;
 }
 
@@ -48,8 +52,7 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
     nationalId: {
         type: String,
         required: [true, "National ID is required"],
-        // Remove unique constraint as it won't work with hashed values
-        // We'll handle uniqueness check at the service level before hashing
+        // Remove unique constraint as it won't work with randomly salted hashes
         validate: [
             {
                 // Validate before saving/hashing (for new records)
@@ -83,11 +86,16 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
         ],
         trim: true,
     },
+    nationalIdUnique: {
+        type: String,
+        sparse: true,
+        unique: true,
+        index: true
+    },
     phone: {
         type: String,
         required: true,
-        // Remove unique constraint as it won't work with hashed values
-        // We'll handle uniqueness check at the service level before hashing
+        // Remove unique constraint as it won't work with randomly salted hashes
         validate: {
             validator: function(this: any, v: string) {
                 // Skip validation if the value is already hashed (when reading from DB)
@@ -99,6 +107,12 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
             message: "Invalid Phone number format"
         },
         trim: true,
+    },
+    phoneUnique: {
+        type: String,
+        sparse: true,
+        unique: true,
+        index: true
     },
     certificate: {
         type: String,
@@ -125,6 +139,14 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
         required: [true, "Governorate is required"],
         index: true, // Index for faster queries
         trim: true,
+    },
+    birthdate: {
+        type: Date,
+        // The actual value will be set in the pre-save hook
+    },
+    age: {
+        type: Number,
+        // The actual value will be set in the pre-save hook
     },
     role: {
         type: String,
@@ -153,20 +175,58 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
  * - Validation is performed on pre-hashed values only
  */
 
+// Import the utility function at the top of the file
+import { extractBirthdateFromNationalId, calculateAge } from '../utils/nationalId.utils';
+
+// Import crypto module at the top
+import crypto from 'crypto';
+
 userSchema.pre('save', async function (next) {
     try {
+        // Store original national ID for age calculation
+        let originalNationalId: string | null = null;
+        let originalPhone: string | null = null;
+        
         // Only hash values if they are new or modified, and only if they don't already look like hashes
         if (this.isNew || this.isModified("nationalId") || this.isModified("phone")) {
             const salt = await bcryptjs.genSalt(10);
 
             if (this.nationalId && !this.nationalId.startsWith('$2')) {
-                this.nationalId = await bcryptjs.hash(this.nationalId, salt);
+                // Preserve the original national ID for age calculation and unique hash
+                originalNationalId = this.nationalId;
+                
+                // Create a deterministic hash for uniqueness checks (SHA-256)
+                this.nationalIdUnique = crypto.createHash('sha256')
+                    .update(originalNationalId)
+                    .digest('hex');
+                
+                // Use bcrypt for the actual storage (security)
+                this.nationalId = await bcryptjs.hash(originalNationalId, salt);
             }
 
             if (this.phone && !this.phone.startsWith('$2')) {
-                this.phone = await bcryptjs.hash(this.phone, salt);
+                // Preserve original phone for unique hash
+                originalPhone = this.phone;
+                
+                // Create a deterministic hash for uniqueness checks (SHA-256)
+                this.phoneUnique = crypto.createHash('sha256')
+                    .update(originalPhone)
+                    .digest('hex');
+                
+                // Use bcrypt for the actual storage (security)
+                this.phone = await bcryptjs.hash(originalPhone, salt);
+            }
+            
+            // Extract age from National ID during user creation
+            if (originalNationalId) {
+                const birthdate = extractBirthdateFromNationalId(originalNationalId);
+                if (birthdate) {
+                    this.birthdate = birthdate;
+                    this.age = calculateAge(birthdate);
+                }
             }
         }
+        
         next();
     }
     catch (error) {

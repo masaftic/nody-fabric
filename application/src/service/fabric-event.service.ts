@@ -143,12 +143,12 @@ export class FabricEventService {
                     const tallyData = JSON.parse(Buffer.from(event.payload).toString());
                     await this.handleTallyComputed(tallyData);
                     break;
-                    
+
                   case 'user_registered':
                     const userData = JSON.parse(Buffer.from(event.payload).toString());
                     await this.handleUserRegistered(userData);
                     break;
-                    
+
                   case 'user_status_updated':
                     const userStatusData = JSON.parse(Buffer.from(event.payload).toString());
                     await this.handleUserStatusUpdated(userStatusData);
@@ -276,10 +276,10 @@ export class FabricEventService {
         eligible_governorates: electionData.eligible_governorates,
         candidate_count: electionData.candidates.length
       });
-      
+
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
-      
+
       logger.info(`Election creation audit event recorded for ${electionId}`);
     } catch (error) {
       logger.error(`Failed to record election creation audit event: ${error instanceof Error ? error.message : String(error)}`);
@@ -293,21 +293,21 @@ export class FabricEventService {
   private async handleElectionUpdated(electionData: any): Promise<void> {
     const electionId = electionData.election_id || electionData.electionId;
     logger.info(`Election ${electionId} updated on blockchain`);
-    
+
     try {
       // Create audit event for election update
       const auditEvent = createAuditEvent('election_updated', {
         election_id: electionId,
         updater_id: 'system', // In a real system, this would come from the event
-        updated_fields: Object.keys(electionData).filter(key => 
+        updated_fields: Object.keys(electionData).filter(key =>
           key !== 'election_id' && key !== 'electionId'
         ),
         status: electionData.status || 'unknown'
       });
-      
+
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
-      
+
       logger.info(`Election update audit event recorded for ${electionId}`);
     } catch (error) {
       logger.error(`Failed to record election update audit event: ${error instanceof Error ? error.message : String(error)}`);
@@ -329,6 +329,9 @@ export class FabricEventService {
       // Update the vote tally in real-time
       await this.updateVoteTally(voteData.election_id, voteData.candidate_id);
 
+      // Note: Analytics are now calculated on-demand via the API endpoint
+      // instead of being updated in real-time here
+
       // Create audit event for the vote
       const auditEvent = createAuditEvent('vote_cast', {
         election_id: voteData.election_id,
@@ -337,7 +340,7 @@ export class FabricEventService {
         receipt: voteData.receipt,
         vote_id: voteData.vote_id
       });
-      
+
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
 
@@ -354,7 +357,7 @@ export class FabricEventService {
   private async handleTallyComputed(tallyData: any): Promise<void> {
     const electionId = tallyData.electionId || tallyData.election_id;
     logger.info(`Tally computed for election ${electionId}`);
-    
+
     try {
       // Create audit event for tally computation
       const auditEvent = createAuditEvent('tally_computed', {
@@ -362,10 +365,10 @@ export class FabricEventService {
         timestamp: tallyData.timestamp,
         computed_by: tallyData.user_id || 'system'
       });
-      
+
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
-      
+
       logger.info(`Tally computation audit event recorded for ${electionId}`);
     } catch (error) {
       logger.error(`Failed to record tally computation audit event: ${error instanceof Error ? error.message : String(error)}`);
@@ -378,7 +381,7 @@ export class FabricEventService {
    */
   private async handleUserRegistered(userData: any): Promise<void> {
     logger.info(`User registered: ${userData.user_id} with role ${userData.role}`);
-    
+
     try {
       // Create audit event for user registration
       const auditEvent = createAuditEvent('user_registered', {
@@ -387,10 +390,10 @@ export class FabricEventService {
         role: userData.role,
         timestamp: userData.timestamp || new Date().toISOString()
       });
-      
+
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
-      
+
       logger.info(`User registration audit event recorded for ${userData.user_id}`);
     } catch (error) {
       logger.error(`Failed to record user registration audit event: ${error instanceof Error ? error.message : String(error)}`);
@@ -403,7 +406,7 @@ export class FabricEventService {
    */
   private async handleUserStatusUpdated(userStatusData: any): Promise<void> {
     logger.info(`User status updated: ${userStatusData.user_id} to ${userStatusData.status}`);
-    
+
     try {
       // Create audit event for user status update
       const auditEvent = createAuditEvent('user_status_updated', {
@@ -413,10 +416,10 @@ export class FabricEventService {
         updated_by: userStatusData.updated_by || 'system',
         timestamp: userStatusData.timestamp || new Date().toISOString()
       });
-      
+
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
-      
+
       logger.info(`User status update audit event recorded for ${userStatusData.user_id}`);
     } catch (error) {
       logger.error(`Failed to record user status update audit event: ${error instanceof Error ? error.message : String(error)}`);
@@ -475,6 +478,11 @@ export class FabricEventService {
       logger.error(`Failed to update vote tally: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  /**
+   * Note: On-demand analytics calculation has been moved to the analytics controller.
+   * These methods have been removed as we no longer update analytics in real-time.
+   */
 }
 
 // This will be initialized in the application startup

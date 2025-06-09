@@ -6,13 +6,14 @@ import { VoteModel, VoteTallyModel } from "../models/election.model";
 import { FeedbackModel } from "../models/feedback.model";
 import { logger } from "../logger";
 import crypto from 'crypto';
+import { ElectionAnalyticsModel } from "../models/analytics.model";
 
 async function castVote(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const { election_id, candidate_id } = req.body;
         // Get userId from JWT token
         const userId = req.user?.user_id;
-        
+
         if (!userId || !election_id || !candidate_id) {
             res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
             return;
@@ -41,7 +42,7 @@ async function getVote(req: Request, res: Response) {
     // Get userId from JWT token
     const userId = req.user?.user_id;
     const { voteId } = req.params;
-    
+
     if (!userId || !voteId) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
         return;
@@ -83,13 +84,13 @@ async function getVotes(req: Request, res: Response) {
 async function getUserVotes(req: Request, res: Response): Promise<void> {
     // If userId in params, use that, otherwise get from JWT token
     let userId = req.params.userId;
-    
+
     // If admin or auditor accessing another user's votes, allow it
     // If no userId provided, use the authenticated user's ID
     if (!userId && req.user) {
         userId = req.user.user_id;
     }
-    
+
     if (!userId) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing user ID' });
         return;
@@ -122,26 +123,26 @@ async function submitVoterFeedback(req: Request, res: Response) {
     try {
         // Verify the vote exists with this receipt
         const vote = await VoteModel.findOne({ receipt, election_id });
-        
+
         if (!vote) {
             res.status(StatusCodes.NOT_FOUND).json({ message: 'Vote receipt not found or does not match election' });
             return;
         }
-        
+
         // Check if the vote belongs to this user
         if (vote.voter_id !== userId) {
             res.status(StatusCodes.FORBIDDEN).json({ message: 'This vote receipt does not belong to you' });
             return;
         }
-        
+
         // Check if feedback already exists for this receipt
         const existingFeedback = await FeedbackModel.findOne({ receipt });
-        
+
         if (existingFeedback) {
             res.status(StatusCodes.CONFLICT).json({ message: 'Feedback has already been submitted for this vote' });
             return;
         }
-        
+
         // Create new feedback
         const feedback = await FeedbackModel.create({
             voter_id: userId,
@@ -151,7 +152,28 @@ async function submitVoterFeedback(req: Request, res: Response) {
             comments: comments || '',
             created_at: new Date()
         });
-        
+
+        const analytics = await ElectionAnalyticsModel.findOne({ election_id: election_id });
+        if (analytics) {
+            // Update analytics with feedback
+            let feedbackCategory;
+            if (feedback) {
+                // Map 1-5 rating to positive/neutral/negative
+                if (feedback.rating >= 4) feedbackCategory = 'positive';
+                else if (feedback.rating >= 3) feedbackCategory = 'neutral';
+                else feedbackCategory = 'negative';
+            }
+
+            const updateQuery: any = {
+                $inc: { [`voter_feedback.${feedbackCategory}`]: 1 },
+                $set: { last_updated: new Date() }
+            };
+
+            // Execute the update
+            await ElectionAnalyticsModel.updateOne({ election_id: election_id }, updateQuery);
+            logger.info(`Feedback for election ${election_id} updated in analytics`);
+        }
+
         res.status(StatusCodes.CREATED).json({
             message: 'Feedback submitted successfully',
             feedback_id: feedback._id
@@ -170,7 +192,7 @@ async function submitVoterFeedback(req: Request, res: Response) {
  */
 async function verifyVote(req: Request, res: Response): Promise<void> {
     const { receipt } = req.params;
-    
+
     if (!receipt) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'Receipt is required' });
         return;
@@ -179,11 +201,11 @@ async function verifyVote(req: Request, res: Response): Promise<void> {
     try {
         // Find vote in MongoDB by receipt
         const vote = await VoteModel.findOne({ receipt });
-        
+
         if (!vote) {
-            res.status(StatusCodes.NOT_FOUND).json({ 
-                verified: false, 
-                message: 'Vote not found with the provided receipt' 
+            res.status(StatusCodes.NOT_FOUND).json({
+                verified: false,
+                message: 'Vote not found with the provided receipt'
             });
             return;
         }
@@ -191,16 +213,16 @@ async function verifyVote(req: Request, res: Response): Promise<void> {
         // Get election details to enhance the response
         let electionName = "Unknown";
         let candidateName = "Unknown";
-        
+
         try {
             // Use admin connection to get election details
             await withFabricAdminConnection(async (contract) => {
                 const blockchainRepo = new BlockChainRepository(contract);
                 const election = await blockchainRepo.getElection(vote.election_id);
-                
+
                 if (election) {
                     electionName = election.name;
-                    
+
                     // Find candidate name
                     const candidate = election.candidates.find(c => c.candidate_id === vote.candidate_id);
                     if (candidate) {
@@ -212,10 +234,10 @@ async function verifyVote(req: Request, res: Response): Promise<void> {
             // If we can't get the additional details, continue with the basic verification
             logger.warn(`Unable to fetch election details for verification: ${error instanceof Error ? error.message : String(error)}`);
         }
-        
+
         // Check if feedback has been submitted
         const feedback = await FeedbackModel.findOne({ receipt });
-        
+
         res.status(StatusCodes.OK).json({
             verified: true,
             message: 'Vote verified successfully',
@@ -226,7 +248,7 @@ async function verifyVote(req: Request, res: Response): Promise<void> {
             },
             feedback_submitted: !!feedback
         });
-        
+
     } catch (error) {
         logger.error(`Error verifying vote: ${error instanceof Error ? error.message : String(error)}`);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
@@ -243,7 +265,7 @@ async function verifyVote(req: Request, res: Response): Promise<void> {
 async function getVoteDetailsByReceipt(req: Request, res: Response): Promise<void> {
     const { receipt } = req.params;
     const userId = req.user?.user_id;
-    
+
     if (!receipt) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'Receipt is required' });
         return;
@@ -257,11 +279,11 @@ async function getVoteDetailsByReceipt(req: Request, res: Response): Promise<voi
     try {
         // Find vote in MongoDB by receipt
         const vote = await VoteModel.findOne({ receipt });
-        
+
         if (!vote) {
-            res.status(StatusCodes.NOT_FOUND).json({ 
-                success: false, 
-                message: 'Vote not found with the provided receipt' 
+            res.status(StatusCodes.NOT_FOUND).json({
+                success: false,
+                message: 'Vote not found with the provided receipt'
             });
             return;
         }
@@ -278,16 +300,16 @@ async function getVoteDetailsByReceipt(req: Request, res: Response): Promise<voi
         // Get election details to enhance the response
         let electionName = "Unknown";
         let candidateName = "Unknown";
-        
+
         try {
             // Use admin connection to get election details
             await withFabricAdminConnection(async (contract) => {
                 const blockchainRepo = new BlockChainRepository(contract);
                 const election = await blockchainRepo.getElection(vote.election_id);
-                
+
                 if (election) {
                     electionName = election.name;
-                    
+
                     // Find candidate name
                     const candidate = election.candidates.find(c => c.candidate_id === vote.candidate_id);
                     if (candidate) {
@@ -299,10 +321,10 @@ async function getVoteDetailsByReceipt(req: Request, res: Response): Promise<voi
             // If we can't get the additional details, continue with the basic verification
             logger.warn(`Unable to fetch election details for verification: ${error instanceof Error ? error.message : String(error)}`);
         }
-        
+
         // Check if feedback has been submitted
         const feedback = await FeedbackModel.findOne({ receipt });
-        
+
         res.status(StatusCodes.OK).json({
             success: true,
             message: 'Vote details retrieved successfully',
@@ -321,7 +343,7 @@ async function getVoteDetailsByReceipt(req: Request, res: Response): Promise<voi
                 created_at: feedback.created_at
             } : null
         });
-        
+
     } catch (error) {
         logger.error(`Error retrieving vote details: ${error instanceof Error ? error.message : String(error)}`);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
@@ -337,7 +359,7 @@ async function getVoteDetailsByReceipt(req: Request, res: Response): Promise<voi
  */
 async function checkUserVotedInElection(req: Request, res: Response): Promise<void> {
     const { userId, electionId } = req.params;
-    
+
     if (!userId || !electionId) {
         res.status(StatusCodes.BAD_REQUEST).json({ message: 'User ID and Election ID are required' });
         return;
@@ -346,10 +368,10 @@ async function checkUserVotedInElection(req: Request, res: Response): Promise<vo
     try {
         // Check if authorized user is making the request
         const requestingUserId = req.user?.user_id;
-        
+
         // If user is not admin/auditor and trying to access someone else's data
-        if (userId !== requestingUserId && 
-            req.user?.role !== 'election_commission' && 
+        if (userId !== requestingUserId &&
+            req.user?.role !== 'election_commission' &&
             req.user?.role !== 'auditor') {
             res.status(StatusCodes.FORBIDDEN).json({
                 success: false,
@@ -359,11 +381,11 @@ async function checkUserVotedInElection(req: Request, res: Response): Promise<vo
         }
 
         // Find vote in MongoDB by voter_id and election_id
-        const vote = await VoteModel.findOne({ 
-            voter_id: userId, 
-            election_id: electionId 
+        const vote = await VoteModel.findOne({
+            voter_id: userId,
+            election_id: electionId
         });
-        
+
         res.status(StatusCodes.OK).json({
             success: true,
             message: vote ? 'User has voted in this election' : 'User has not voted in this election',
@@ -373,7 +395,7 @@ async function checkUserVotedInElection(req: Request, res: Response): Promise<vo
             // Include receipt only if the vote exists
             ...(vote && { receipt: vote.receipt })
         });
-        
+
     } catch (error) {
         logger.error(`Error checking voting status: ${error instanceof Error ? error.message : String(error)}`);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({

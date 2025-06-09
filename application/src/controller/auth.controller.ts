@@ -31,7 +31,7 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
     }
 
     try {
-        // Check if national ID is already in use
+        // Check if national ID is already in use - fast lookup using SHA-256 hashes
         const isNationalIdInUse = await userService.isNationalIdInUse(req.body.national_id);
         if (isNationalIdInUse) {
             res.status(StatusCodes.CONFLICT).json({
@@ -40,7 +40,7 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             return;
         }
         
-        // Check if phone number is already in use
+        // Check if phone number is already in use - fast lookup using SHA-256 hashes
         const isPhoneInUse = await userService.isPhoneNumberInUse(req.body.phone);
         if (isPhoneInUse) {
             res.status(StatusCodes.CONFLICT).json({
@@ -49,7 +49,7 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             return;
         }
         
-        const identityManager = new IdentityManager();
+        // Create unique ID for the new user
         const user_id = crypto.randomUUID(); // voterId
 
         // Default role is 'voter'
@@ -71,12 +71,14 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             role = validatedRole;
         }
 
+        const identityManager = new IdentityManager();
         const admin = await identityManager.enrollAdmin();
         const secret = await identityManager.registerUser(admin, user_id, '', role.toString());
 
         const userEnrollment = await identityManager.enrollUser(user_id, secret);
 
-        // Save user details in MongoDB
+        // Save user details in MongoDB - using optimistic approach for better performance
+        // The uniqueness of nationalId and phone will be enforced by MongoDB unique constraints
         const userData = new UserModel({
             userId: user_id,
             nationalId: req.body.national_id,
@@ -87,7 +89,31 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             status: 'active',
         });
 
-        await userService.saveUser(userData);
+        // try {
+            // Directly save to MongoDB - more efficient than going through userService
+            await userData.save();
+        // } catch (dbError: any) {
+        //     // Handle MongoDB duplicate key errors with specific error messages
+        //     if (dbError.code === 11000) {
+        //         // Extract the duplicate field name from the error message
+        //         const field = Object.keys(dbError.keyPattern)[0];
+        //         if (field === 'nationalId') {
+        //             res.status(StatusCodes.CONFLICT).json({
+        //                 message: 'National ID already registered'
+        //             });
+        //         } else if (field === 'phone') {
+        //             res.status(StatusCodes.CONFLICT).json({
+        //                 message: 'Phone number already registered'
+        //             });
+        //         } else {
+        //             res.status(StatusCodes.CONFLICT).json({
+        //                 message: 'User already exists'
+        //             });
+        //         }
+        //         return;
+        //     }
+        //     throw dbError; // Re-throw if not a duplicate key error
+        // }
 
         await withFabricAdminConnection(async (contract) => {
             const blockchainRepo = new BlockChainRepository(contract);

@@ -72,7 +72,7 @@ Response:
 ]
 ```
 
-## `GET /elections/:election_id/analytics` // Not implemented yet
+## `GET /elections/:election_id/analytics`
 
 authorized roles: election commission, auditor
 
@@ -85,11 +85,15 @@ Response:
     "candidate_votes": [
         {
             "candidate_id": "string",
-            "votes": 500
+            "name": "string",
+            "votes": 500,
+            "percentage": 50.0
         },
         {
             "candidate_id": "string",
-            "votes": 300
+            "name": "string",
+            "votes": 300,
+            "percentage": 30.0
         }
     ],
     "voter_demographics": {
@@ -107,16 +111,12 @@ Response:
         "location_3": 200,
         "location_4": 100
     },
-    "voter_turnout": {
-        "total_registered": 5000,
-        "total_voted": 1000,
-        "turnout_rate": 20.0
-    },
     "voter_feedback": {
         "positive": 800,
         "neutral": 150,
         "negative": 50
-    }
+    },
+    "last_updated": "2023-10-01T00:00:00Z",
 }
 ```
 

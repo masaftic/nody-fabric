@@ -8,4 +8,4 @@ hyperledger-fabric/bin
 application/.env
 .env
 wallet/
-uploads/
+# uploads/

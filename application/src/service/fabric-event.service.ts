@@ -192,26 +192,26 @@ export class FabricEventService {
         {
           name: 'Candidate 1',
           party: 'Party A',
-          profile_image: 'image1.png',
+          profile_image: 'uploads/356306451_54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg',
           description: 'Candidate 1 description'
         },
         {
           name: 'Candidate 2',
           party: 'Party B',
-          profile_image: 'image2.png',
+          profile_image: 'uploads/356307049_c84082ec-d429-4ddd-9e6d-b162ba88a5aa.jpg',
           description: 'Candidate 2 description'
         },
         {
           name: 'Candidate 3',
           party: 'Independent',
-          profile_image: 'image3.png',
+          profile_image: 'uploads/395229648_93f50dd8-9dec-4f20-ad88-d40acc26dec5.jpg',
           description: 'Candidate 3 description'
         }
       ],
       start_time: new Date().toISOString(),
       end_time: new Date(Date.now() + 86400000).toISOString(), // 1 day later
-      eligible_governorates: ['البحر الأحمر', 'القاهرة', 'الإسكندرية'], // Example governorates
-      election_image: 'election_image.png' // URL to election image
+      eligible_governorates: [...Governorates], // Example governorates
+      election_image: 'uploads/21357_pri_boardelections_hero_777797.png' // URL to election image
     };
 
     const blockchainRepo = new BlockChainRepository(this.contract);

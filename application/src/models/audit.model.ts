@@ -86,7 +86,7 @@ export function generateEventId(): string {
 export function createAuditEvent(
   eventType: EventType, 
   details: Record<string, any>, 
-  blockNumber?: number,
+  blockNumber?: bigint | number,
   txId?: string
 ): AuditEvent {
   return {
@@ -94,7 +94,7 @@ export function createAuditEvent(
     timestamp: new Date().toISOString(),
     event_type: eventType,
     details,
-    block_number: blockNumber,
+    block_number: blockNumber !== undefined ? Number(blockNumber) : undefined,
     tx_id: txId
   };
 }

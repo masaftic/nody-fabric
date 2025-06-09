@@ -119,44 +119,46 @@ export class FabricEventService {
               try {
                 logger.debug(`Received chaincode event: ${event.eventName}`);
                 const payload = Buffer.from(event.payload).toString();
+                const blockNumber = event.blockNumber;
+                const transactionId = event.transactionId;
 
                 // Process different event types based on the event name
                 switch (event.eventName) {
                   case 'vote_cast':
                     const voteData: Vote = JSON.parse(Buffer.from(event.payload).toString());
                     logger.info(`Vote cast for election ${voteData.election_id}`);
-                    await this.handleVoteCast(voteData);
+                    await this.handleVoteCast(voteData, blockNumber, transactionId);
                     break;
 
                   case 'election_created':
                     logger.info('Processing election created event');
                     const electionData: Election = JSON.parse(Buffer.from(event.payload).toString());
-                    await this.handleElectionCreated(electionData);
+                    await this.handleElectionCreated(electionData, blockNumber, transactionId);
                     break;
 
                   case 'election_updated':
                     const updatedData = JSON.parse(Buffer.from(event.payload).toString());
-                    await this.handleElectionUpdated(updatedData);
+                    await this.handleElectionUpdated(updatedData, blockNumber, transactionId);
                     break;
                   
                   case 'election_status_changed':
                     const changedData = JSON.parse(Buffer.from(event.payload).toString());
-                    await this.handleElectionStatusUpdated(changedData);
+                    await this.handleElectionStatusUpdated(changedData, blockNumber, transactionId);
                     break;
 
                   case 'tally_computed':
                     const tallyData = JSON.parse(Buffer.from(event.payload).toString());
-                    await this.handleTallyComputed(tallyData);
+                    await this.handleTallyComputed(tallyData, blockNumber, transactionId);
                     break;
 
                   case 'user_registered':
                     const userData = JSON.parse(Buffer.from(event.payload).toString());
-                    await this.handleUserRegistered(userData);
+                    await this.handleUserRegistered(userData, blockNumber, transactionId);
                     break;
 
                   case 'user_status_updated':
                     const userStatusData = JSON.parse(Buffer.from(event.payload).toString());
-                    await this.handleUserStatusUpdated(userStatusData);
+                    await this.handleUserStatusUpdated(userStatusData, blockNumber, transactionId);
                     break;
 
                   default:
@@ -185,7 +187,7 @@ export class FabricEventService {
   }
 
 
-  async handleElectionStatusUpdated(changedData: any) {
+  async handleElectionStatusUpdated(changedData: any, blockNumber?: bigint, txId?: string) {
     const electionId = changedData.election_id;
     logger.info(`Election ${electionId} status changed to ${changedData.new_status}`);
     try {
@@ -196,7 +198,7 @@ export class FabricEventService {
         new_status: changedData.new_status,
         timestamp: changedData.timestamp || new Date().toISOString(),
         changed_by: 'system'
-      });
+      }, blockNumber, txId);
 
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
@@ -290,8 +292,10 @@ export class FabricEventService {
   /**
    * Handle election created event
    * @param electionData The election data
+   * @param blockNumber The block number from the event
+   * @param txId The transaction ID from the event
    */
-  private async handleElectionCreated(electionData: Election): Promise<void> {
+  private async handleElectionCreated(electionData: Election, blockNumber?: bigint, txId?: string): Promise<void> {
     const electionId = electionData.election_id;
     logger.info(`Election ${electionId} created on blockchain: "${electionData.name}"`);
 
@@ -303,7 +307,7 @@ export class FabricEventService {
         creator_id: 'system', // In a real system, this would come from the event
         eligible_governorates: electionData.eligible_governorates,
         candidate_count: electionData.candidates.length
-      });
+      }, blockNumber, txId);
 
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
@@ -317,8 +321,10 @@ export class FabricEventService {
   /**
    * Handle election updated event
    * @param electionData The election data
+   * @param blockNumber The block number from the event
+   * @param txId The transaction ID from the event
    */
-  private async handleElectionUpdated(electionData: any): Promise<void> {
+  private async handleElectionUpdated(electionData: any, blockNumber?: bigint, txId?: string): Promise<void> {
     const electionId = electionData.election_id || electionData.electionId;
     logger.info(`Election ${electionId} updated on blockchain`);
 
@@ -331,7 +337,7 @@ export class FabricEventService {
           key !== 'election_id' && key !== 'electionId'
         ),
         status: electionData.status || 'unknown'
-      });
+      }, blockNumber, txId);
 
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
@@ -345,8 +351,10 @@ export class FabricEventService {
   /**
    * Handle vote cast event
    * @param voteData The entire vote object from the blockchain
+   * @param blockNumber The block number from the event
+   * @param txId The transaction ID from the event
    */
-  private async handleVoteCast(voteData: Vote): Promise<void> {
+  private async handleVoteCast(voteData: Vote, blockNumber?: bigint, txId?: string): Promise<void> {
     logger.info(`Vote cast for candidate ${voteData.candidate_id} in election ${voteData.election_id}`);
 
     try {
@@ -367,7 +375,7 @@ export class FabricEventService {
         candidate_id: voteData.candidate_id,
         receipt: voteData.receipt,
         vote_id: voteData.vote_id
-      });
+      }, blockNumber, txId);
 
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
@@ -381,8 +389,10 @@ export class FabricEventService {
   /**
    * Handle tally computed event
    * @param tallyData The tally data from the event
+   * @param blockNumber The block number from the event
+   * @param txId The transaction ID from the event
    */
-  private async handleTallyComputed(tallyData: any): Promise<void> {
+  private async handleTallyComputed(tallyData: any, blockNumber?: bigint, txId?: string): Promise<void> {
     const electionId = tallyData.electionId || tallyData.election_id;
     logger.info(`Tally computed for election ${electionId}`);
 
@@ -392,7 +402,7 @@ export class FabricEventService {
         election_id: electionId,
         timestamp: tallyData.timestamp,
         computed_by: tallyData.user_id || 'system'
-      });
+      }, blockNumber, txId);
 
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
@@ -406,8 +416,10 @@ export class FabricEventService {
   /**
    * Handle user registered event
    * @param userData The user data from the event
+   * @param blockNumber The block number from the event
+   * @param txId The transaction ID from the event
    */
-  private async handleUserRegistered(userData: any): Promise<void> {
+  private async handleUserRegistered(userData: any, blockNumber?: bigint, txId?: string): Promise<void> {
     logger.info(`User registered: ${userData.user_id} with role ${userData.role}`);
 
     try {
@@ -417,7 +429,7 @@ export class FabricEventService {
         governorate: userData.governorate,
         role: userData.role,
         timestamp: userData.timestamp || new Date().toISOString()
-      });
+      }, blockNumber, txId);
 
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);
@@ -431,8 +443,10 @@ export class FabricEventService {
   /**
    * Handle user status updated event
    * @param userStatusData The user status data from the event
+   * @param blockNumber The block number from the event
+   * @param txId The transaction ID from the event
    */
-  private async handleUserStatusUpdated(userStatusData: any): Promise<void> {
+  private async handleUserStatusUpdated(userStatusData: any, blockNumber?: bigint, txId?: string): Promise<void> {
     logger.info(`User status updated: ${userStatusData.user_id} to ${userStatusData.status}`);
 
     try {
@@ -443,7 +457,7 @@ export class FabricEventService {
         reason: userStatusData.reason || 'Not specified',
         updated_by: userStatusData.updated_by || 'system',
         timestamp: userStatusData.timestamp || new Date().toISOString()
-      });
+      }, blockNumber, txId);
 
       // Store the audit event in MongoDB
       await AuditEventModel.create(auditEvent);

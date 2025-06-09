@@ -20,9 +20,10 @@ export const createServerApp = async () => {
     const app = express();
     const httpServer = createServer(app);
 
+
     // allow cors
     app.use(cors());
-
+    app.use(express.json())
     // Initialize Socket.IO for remote signing
     const io = initSocketIOService(httpServer);
     logger.info('Socket.IO service initialized for remote signing');

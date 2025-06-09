@@ -15,6 +15,7 @@ import { invitationService } from "../service/invitation.service";
 import { Governorates } from "../models/election.model";
 
 
+
 async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response) {
     if (!req.body.national_id || !req.body.phone || !req.body.governorate) {
         res.status(StatusCodes.BAD_REQUEST).json({
@@ -207,3 +208,4 @@ export {
     register as userRegister, sendOtp as sendSmsOtp,
     resendOtp as resendSmsOtp, verifyOtp as verifySmsOtp
 }
+

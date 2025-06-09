@@ -1,7 +1,7 @@
 import { Contract, Network, checkpointers } from '@hyperledger/fabric-gateway';
 import { logger } from '../logger';
 import { BlockChainRepository } from '../fabric-utils/BlockChainRepository';
-import { CreateElectionRequest, Election, Governorates, Vote, VoteModel, VoteTallyModel } from '../models/election.model';
+import { CreateElectionRequest, Election, ElectionStatus, Governorates, Vote, VoteModel, VoteTallyModel } from '../models/election.model';
 import { AuditEventModel, createAuditEvent, EventType } from '../models/audit.model';
 
 /**
@@ -138,6 +138,11 @@ export class FabricEventService {
                     const updatedData = JSON.parse(Buffer.from(event.payload).toString());
                     await this.handleElectionUpdated(updatedData);
                     break;
+                  
+                  case 'election_status_changed':
+                    const changedData = JSON.parse(Buffer.from(event.payload).toString());
+                    await this.handleElectionStatusUpdated(changedData);
+                    break;
 
                   case 'tally_computed':
                     const tallyData = JSON.parse(Buffer.from(event.payload).toString());
@@ -179,10 +184,33 @@ export class FabricEventService {
     });
   }
 
+
+  async handleElectionStatusUpdated(changedData: any) {
+    const electionId = changedData.election_id;
+    logger.info(`Election ${electionId} status changed to ${changedData.new_status}`);
+    try {
+      // Create audit event for election status change
+      const auditEvent = createAuditEvent('election_status_changed', {
+        election_id: electionId,
+        old_status: changedData.old_status,
+        new_status: changedData.new_status,
+        timestamp: changedData.timestamp || new Date().toISOString(),
+        changed_by: 'system'
+      });
+
+      // Store the audit event in MongoDB
+      await AuditEventModel.create(auditEvent);
+
+      logger.info(`Election status change audit event recorded for ${electionId}`);
+    } catch (error) {
+      logger.error(`Failed to record election status change audit event: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   /**
    * Create a sample election for testing
    */
-  private async createSampleElection(): Promise<void> {
+  async createSampleElection(): Promise<void> {
     logger.info('Creating sample test election');
 
     const sampleElection: CreateElectionRequest = {
@@ -209,7 +237,7 @@ export class FabricEventService {
         }
       ],
       start_time: new Date().toISOString(),
-      end_time: new Date(Date.now() + 86400000).toISOString(), // 1 day later
+      end_time: new Date(Date.now() + 70000).toISOString(), // 1 day later
       eligible_governorates: [...Governorates], // Example governorates
       election_image: 'uploads/21357_pri_boardelections_hero_777797.png' // URL to election image
     };

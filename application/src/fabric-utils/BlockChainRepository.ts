@@ -4,7 +4,8 @@ import {
     Election,
     CreateElectionRequest,
     VoteTally,
-    BlockchainVoteTally
+    BlockchainVoteTally,
+    ElectionStatus
 } from '../models/election.model';
 import { 
     BaseRepository,
@@ -77,6 +78,11 @@ export class BlockChainRepository {
     async computeVoteTally(tallyId: string, electionID: string): Promise<BlockchainVoteTally> {
         return this.electionRepo.computeVoteTally(tallyId, electionID);
     }
+
+    async updateElectionStatus(electionID: string, newStatus: ElectionStatus): Promise<void> {
+        return this.electionRepo.updateElectionStatus(electionID, newStatus);
+    }
+
 
     async clearElections(): Promise<void> {
         return this.electionRepo.clearElections();

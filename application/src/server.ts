@@ -9,6 +9,7 @@ import { electionRouter } from "./routes/elections.route";
 import { ledgerRouter } from "./routes/ledger.route";
 import connectDb, { isDbConnected } from './config/connectToDbAtlas';
 import { initFabricEventService } from './service/fabric-event.service';
+import { initElectionSchedulerService } from './service/election-scheduler.service';
 import { initSocketIOService } from './service/socket-io.service';
 import { uploadsRouter } from './routes/uploads.route';
 import { usersRouter } from './routes/users.route';
@@ -54,11 +55,24 @@ export const createServerApp = async () => {
             const network = gateway.getNetwork('mychannel');
 
             // Initialize and start the event service
-            const eventService = initFabricEventService(network);
-            await eventService.syncInitialData();
-            await eventService.startListening();
+            try
+            {
+                const eventService = initFabricEventService(network);
+                await eventService.createSampleElection();
+                await eventService.startListening();
+                logger.info('Fabric event service initialized and started');
+            } catch (error) {
+                logger.error(`Failed to initialize Fabric event service: ${error instanceof Error ? error.message : String(error)}`);
+            }
 
-            logger.info('Fabric event service initialized and started');
+            
+            // Initialize and start the election scheduler service
+            try {
+                const schedulerService = await initElectionSchedulerService();
+                logger.info('Election scheduler service initialized and started');
+            } catch (error) {
+                logger.error(`Failed to initialize election scheduler: ${error instanceof Error ? error.message : String(error)}`);
+            }
 
             // Don't close the connection - we need it for the event listeners
             // We'll handle proper shutdown in the process termination handlers
@@ -79,7 +93,7 @@ export const createServerApp = async () => {
             });
 
         } catch (error) {
-            logger.error(`Failed to initialize Fabric event service: ${error instanceof Error ? error.message : String(error)}`);
+            logger.error(`Unexpected error during Fabric initialization: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 

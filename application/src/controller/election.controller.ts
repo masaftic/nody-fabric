@@ -16,6 +16,7 @@ import {
 } from "../models/election.model";
 import { logger } from "../logger";
 import { stat } from "fs";
+import { getSchedulerService } from "../service/election-scheduler.service";
 
 export async function getElection(req: Request, res: Response) {
     try {
@@ -235,6 +236,75 @@ export async function getVoteTally(req: Request, res: Response): Promise<void> {
         logger.error(`Error retrieving vote tally: ${error instanceof Error ? error.message : String(error)}`);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
             message: `Error retrieving vote tally: ${error instanceof Error ? error.message : String(error)}`
+        });
+    }
+}
+
+/**
+ * Publish election results, transitioning from Ended to Published state
+ * This is typically triggered manually by election officials after validating results
+ */
+export async function publishElectionResults(req: Request, res: Response): Promise<void> {
+    try {
+        // Get userId from JWT token
+        const userId = req.user?.user_id;
+        const { electionId } = req.params;
+        
+        if (!userId || !electionId) {
+            res.status(StatusCodes.BAD_REQUEST).json({ message: 'Missing required fields' });
+            return;
+        }
+
+        // Get the election details to verify current status
+        const election = await withFabricConnection(userId, async (contract) => {
+            const blockchainRepo = new BlockChainRepository(contract);
+            return await blockchainRepo.getElection(electionId);
+        });
+        
+        if (election.status !== ElectionStatus.Ended) {
+            res.status(StatusCodes.BAD_REQUEST).json({ 
+                message: `Cannot publish results for election ${electionId} as it is not in 'ended' state (current state: ${election.status})`
+            });
+            return;
+        }
+
+        // Use the scheduler service to publish the results
+        // This ensures a consistent process for publishing results
+        const schedulerService = getSchedulerService();
+        await schedulerService.publishElectionResults(electionId);
+        
+        // Get the final tally data
+        const tally = await VoteTallyModel.findOne({ election_id: electionId });
+        
+        if (!tally) {
+            res.status(StatusCodes.NOT_FOUND).json({ message: 'No votes found for this election' });
+            return;
+        }
+
+        // Create a response that matches the documented format
+        const candidatesWithVotes = election.candidates.map(candidate => {
+            return {
+                candidate_id: candidate.candidate_id,
+                name: candidate.name,
+                party: candidate.party,
+                votes: tally.tallies.get(candidate.candidate_id) || 0
+            };
+        });
+
+        res.status(StatusCodes.OK).json({
+            message: "Election results published successfully",
+            election_id: electionId,
+            election_name: election.name,
+            total_votes: tally.total_votes,
+            status: ElectionStatus.Published,
+            candidates: candidatesWithVotes,
+            published_at: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        logger.error(`Error publishing election results: ${error instanceof Error ? error.message : String(error)}`);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: `Error publishing election results: ${error instanceof Error ? error.message : String(error)}`
         });
     }
 }

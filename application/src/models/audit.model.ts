@@ -9,7 +9,9 @@ export type EventType =
   | 'election_updated' 
   | 'tally_computed' 
   | 'user_registered' 
-  | 'user_status_updated';
+  | 'user_status_updated'
+  | 'election_status_changed';
+
 
 // Base audit event structure
 export interface AuditEvent {

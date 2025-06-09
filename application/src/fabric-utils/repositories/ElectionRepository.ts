@@ -100,6 +100,17 @@ export class ElectionRepository extends BaseRepository {
     }
 
     /**
+     * Update election status
+     * @param electionID ID of the election to update
+     * @param newStatus New status to set
+     */
+    async updateElectionStatus(electionID: string, newStatus: ElectionStatus): Promise<void> {
+        logger.info('Submit Transaction: UpdateElectionStatus, setting election %s to status %s', electionID, newStatus);
+        await this.contract.submitTransaction('UpdateElectionStatus', electionID, newStatus);
+        logger.info('Transaction committed successfully: election status updated for ID %s to %s', electionID, newStatus);
+    }
+
+    /**
      * Compute the vote tally for an election
      */
     async computeVoteTally(tallyID: string, electionID: string): Promise<BlockchainVoteTally> {

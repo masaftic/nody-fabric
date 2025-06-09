@@ -187,3 +187,36 @@ Response:
 }
 ```
 
+## `POST /elections/:election_id/publish`
+
+Publish the final results for an election, making them available to all users. This can only be called on elections that are in the 'ended' state.
+
+authorized roles: election commission
+
+Response:
+
+```json
+{
+    "election_id": "string",
+    "election_name": "string",
+    "total_votes": 1000,
+    "status": "published",
+    "candidates": [
+        {
+            "candidate_id": "string",
+            "name": "string",
+            "party": "string",
+            "votes": 500
+        },
+        {
+            "candidate_id": "string",
+            "name": "string",
+            "party": "string",
+            "votes": 300
+        }
+    ],
+    "published_at": "2023-10-01T00:00:00Z",
+    "message": "Election results published successfully"
+}
+```
+

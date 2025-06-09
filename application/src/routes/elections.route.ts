@@ -3,7 +3,8 @@ import {
     getElection,
     getAllElections,
     createElection,
-    getVoteTally
+    getVoteTally,
+    publishElectionResults
 } from "../controller/election.controller";
 import { getElectionAnalytics } from "../controller/analytics.controller";
 
@@ -19,6 +20,7 @@ router.post("/", authenticate, authorize([UserRole.ElectionCommission]), createE
 router.get("/:electionId/analytics", authenticate, authorize([UserRole.ElectionCommission, UserRole.Auditor]), getElectionAnalytics);
 
 router.get("/:electionId/tally", authenticate, getVoteTally);
+router.post("/:electionId/publish", authenticate, authorize([UserRole.ElectionCommission]), publishElectionResults);
 
 export {
     router as electionRouter

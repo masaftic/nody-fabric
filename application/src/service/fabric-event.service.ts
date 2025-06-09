@@ -1,7 +1,7 @@
 import { Contract, Network, checkpointers } from '@hyperledger/fabric-gateway';
 import { logger } from '../logger';
 import { BlockChainRepository } from '../fabric-utils/BlockChainRepository';
-import { CreateElectionRequest, Election, Vote, VoteModel, VoteTallyModel } from '../models/election.model';
+import { CreateElectionRequest, Election, Governorates, Vote, VoteModel, VoteTallyModel } from '../models/election.model';
 import { AuditEventModel, createAuditEvent, EventType } from '../models/audit.model';
 
 /**

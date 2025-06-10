@@ -216,26 +216,26 @@ export class FabricEventService {
     logger.info('Creating sample test election');
 
     const sampleElection: CreateElectionRequest = {
-      name: 'Initial Election',
-      description: 'Sample test election created automatically',
+      name: 'الانتخابات الرئاسية المصرية 2025',
+      description: 'انتخابات رئاسية لاختيار رئيس جمهورية مصر العربية لعام 2025. يرجى اختيار مرشحك المفضل من بين المرشحين التاليين.',
       candidates: [
         {
-          name: 'Candidate 1',
-          party: 'Party A',
+          name: 'عبد الله المصري',
+          party: 'حزب الحرية والعدالة',
           profile_image: 'uploads/356306451_54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg',
-          description: 'Candidate 1 description'
+          description: 'سياسي مصري مخضرم، شغل عدة مناصب وزارية، ويعد من أبرز المدافعين عن العدالة الاجتماعية والإصلاح الاقتصادي.'
         },
         {
-          name: 'Candidate 2',
-          party: 'Party B',
+          name: 'سارة عبد الفتاح',
+          party: 'حزب النور',
           profile_image: 'uploads/356307049_c84082ec-d429-4ddd-9e6d-b162ba88a5aa.jpg',
-          description: 'Candidate 2 description'
+          description: 'أستاذة جامعية وناشطة في مجال حقوق المرأة، تركز حملتها على التعليم والصحة وتمكين الشباب.'
         },
         {
-          name: 'Candidate 3',
-          party: 'Independent',
+          name: 'محمود علي',
+          party: 'مستقل',
           profile_image: 'uploads/395229648_93f50dd8-9dec-4f20-ad88-d40acc26dec5.jpg',
-          description: 'Candidate 3 description'
+          description: 'رجل أعمال ناجح، يطرح رؤية اقتصادية جديدة لمصر ويعد بمحاربة الفساد ودعم الاستثمار.'
         }
       ],
       start_time: new Date().toISOString(),

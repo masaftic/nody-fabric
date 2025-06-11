@@ -6,6 +6,7 @@ import { twilioService } from "../service/twilio.service";
 import verifyPhoneNumber from "../utils/verifyPhoneNumber";
 import BadRequestError from "../errors/BadRequest.error";
 import { userService } from '../service/user.service';
+import { faceVerificationService } from '../service/face-verification.service';
 import UserModel, { UserRegisterRequest, UserRole } from '../models/user.model';
 import { fabricAdminConnection, fabricConnection, withFabricAdminConnection } from "../fabric-utils/fabric";
 import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
@@ -29,6 +30,26 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             message: 'Invalid governorate'
         });
         return;
+    }
+    
+    // Check face verification unless invitation code is provided
+    if (!req.body.invitation_code) {
+        // Face verification is required for regular voters
+        if (!req.body.face_verification_secret) {
+            res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'Face verification is required. Please complete ID verification first.'
+            });
+            return;
+        }
+        
+        // Validate the face verification secret
+        const isValidSecret = faceVerificationService.validateSecret(req.body.national_id, req.body.face_verification_secret);
+        if (!isValidSecret) {
+            res.status(StatusCodes.UNAUTHORIZED).json({
+                message: 'Invalid or expired face verification. Please complete ID verification again.'
+            });
+            return;
+        }
     }
 
     try {

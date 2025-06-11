@@ -110,6 +110,29 @@ async function getUserVotes(req: Request, res: Response): Promise<void> {
     }
 }
 
+export async function getUserReceipts(req: Request, res: Response): Promise<void> {
+    const userId = req.user?.user_id;
+    if (!userId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Authentication required' });
+        return;
+    }
+    try {
+        // Get user's votes from MongoDB
+        const votes = await VoteModel.find({ voter_id: userId }, 'receipt election_id created_at').sort({ created_at: -1 });
+        res.status(StatusCodes.OK).json({
+            message: 'User receipts retrieved successfully',
+            receipts: votes.map(vote => ({
+                receipt: vote.receipt,
+                election_id: vote.election_id,
+                created_at: vote.created_at
+            }))
+        });
+    } catch (error) {
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: `Error retrieving user receipts: ${error instanceof Error ? error.message : String(error)}`
+        });
+    }
+}
 
 async function submitVoterFeedback(req: Request, res: Response) {
     const { election_id, receipt, rating, comments } = req.body;

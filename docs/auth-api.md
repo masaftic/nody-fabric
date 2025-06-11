@@ -9,7 +9,8 @@ Request:
     "national_id": "30206281400132",
     "phone": "01222544472",
     "governorate": "Governorate1",
-    "invitation_code": "ABC1234" // Optional, used for roles like election commission or auditor
+    "face_verification_secret": "a1b2c3d4e5...", // Required for regular voters, obtained from face verification process
+    "invitation_code": "ABC1234" // Optional, used for roles like election commission or auditor (bypasses face verification)
 }
 ```
 

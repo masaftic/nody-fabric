@@ -39,6 +39,7 @@ export interface UserRegisterRequest {
     phone: string;
     governorate: Governorate;
     invitation_code?: string; // Optional invitation code for admin or auditor registration
+    face_verification_secret?: string; // Secret received from face verification process
 }
 
 

@@ -177,3 +177,27 @@ Response:
     "receipt": "string" // only included if hasVoted is true
 }
 ```
+
+### GET `/votes/receipts/mine`
+
+authorized roles: voter
+
+Response:
+
+```json
+{
+    "message": "User receipts retrieved successfully",
+    "receipts": [
+        {
+            "receipt": "string",
+            "election_id": "string",
+            "created_at": "2023-10-01T00:00:00Z"
+        },
+        {
+            "receipt": "string",
+            "election_id": "string",
+            "created_at": "2023-10-01T00:05:00Z"
+        }
+    ]
+}
+```

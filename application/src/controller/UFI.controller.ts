@@ -1,58 +1,60 @@
 // @ts-nocheck
 import FlaskService from "../service/flask.service";
-import {StatusCodes} from "http-status-codes";
+import { StatusCodes } from "http-status-codes";
+import { Request, Response } from "express";
 
-import {logger} from "../logger";
+import { logger } from "../logger";
+import { faceVerificationService } from "../service/face-verification.service";
 const flaskService = new FlaskService("http://localhost:5000")
 
-const getUserFaceEmbedding = async (req:Request, res:Response) => {
+const getUserFaceEmbedding = async (req: Request, res: Response) => {
 
     logger.info(req.url)
-    if(!req.file){
+    if (!req.file) {
         return res.status(StatusCodes.BAD_REQUEST).json({ error: 'No image uploaded' });
     }
-    const imagePath:string = req.file.path;
+    const imagePath: string = req.file.path;
     logger.info(`imagepath --> ${imagePath}`)
-    if(!imagePath)
+    if (!imagePath)
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-            message:"Faild to extract face embedding"
+            message: "Failed to extract face embedding"
         })
 
-    const response : number[] | string = await flaskService.getFaceEmbedding(imagePath)
+    const response: number[] | string = await flaskService.getFaceEmbedding(imagePath)
 
     logger.info(`there is response ${response}`)
-    if(typeof response == "string")
+    if (typeof response == "string")
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
             message: response
         })
-    else{
+    else {
         return res.status(StatusCodes.OK).json({
-            embedding:response
+            embedding: response
         })
     }
 }
 
-const verifyUserFace = async (req:Request, res:Response) => {
-    const {embedding1, embedding2} = req.body
+const verifyUserFace = async (req: Request, res: Response) => {
+    const { embedding1, embedding2 } = req.body
     if (embedding1 === "" || embedding2 === '')
         return res.status(StatusCodes.BAD_REQUEST).json({
-            message:"Missing Required Falids"
+            message: "Missing Required Fields"
         })
-    const response : string = await flaskService.verifyFace(embedding1, embedding2)
+    const response: string = await flaskService.verifyFace(embedding1, embedding2)
     console.log(`response from controller --> ${response}`)
-    if(!response)
+    if (!response)
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-            message:"Faild to verify face"
+            message: "Failed to verify face"
         })
-    return  res.status(StatusCodes.OK).json({
-        message:response
+    return res.status(StatusCodes.OK).json({
+        message: response
     })
 }
 
 const extractUserInfo = async (req: Request, res: Response) => {
     if (!req.files || !req.files.front || !req.files.back) {
         return res.status(StatusCodes.BAD_REQUEST).json({
-            message:"Both images are required"
+            message: "Both images are required"
         });
     }
     const frontImagePath = req.files.front[0].path; // Using [0] because it's an array
@@ -60,10 +62,11 @@ const extractUserInfo = async (req: Request, res: Response) => {
 
     const response = await flaskService.processCardId(frontImagePath, backImagePath)
 
-    if(!response)
+    if (!response) {
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-            "message" :"Operation Falid"
+            message: "Operation Failed"
         })
+    }
     // {
     //     data: {
     //         address: 'دمباط عع ماشارع ابراا رذا _  الثانية دمباط',
@@ -73,8 +76,17 @@ const extractUserInfo = async (req: Request, res: Response) => {
     //     },
     //     status: 'success'
     // }
+
+    // Generate face verification secret if national ID is present in the response
+    let verificationSecret = null;
+    if (response.data && response.data.id) {
+        verificationSecret = faceVerificationService.generateSecret(response.data.id);
+    }
+
     return res.status(StatusCodes.OK).json({
-        message:"Operation Done"
+        message: "Operation Done",
+        data: response,
+        face_verification_secret: verificationSecret
     })
 }
 export {

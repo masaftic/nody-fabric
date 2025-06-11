@@ -7,6 +7,7 @@ import verifyPhoneNumber from "../utils/verifyPhoneNumber";
 import BadRequestError from "../errors/BadRequest.error";
 import { userService } from '../service/user.service';
 import { faceVerificationService } from '../service/face-verification.service';
+import { otpVerificationService } from '../service/otp-verification.service';
 import UserModel, { UserRegisterRequest, UserRole } from '../models/user.model';
 import { fabricAdminConnection, fabricConnection, withFabricAdminConnection } from "../fabric-utils/fabric";
 import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
@@ -31,8 +32,8 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
         });
         return;
     }
-    
-    // Check face verification unless invitation code is provided
+
+    // Bypass all verification checks if invitation code is provided
     if (!req.body.invitation_code) {
         // Face verification is required for regular voters
         if (!req.body.face_verification_secret) {
@@ -41,12 +42,29 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             });
             return;
         }
-        
+
         // Validate the face verification secret
-        const isValidSecret = faceVerificationService.validateSecret(req.body.national_id, req.body.face_verification_secret);
-        if (!isValidSecret) {
+        const isValidFaceSecret = faceVerificationService.validateSecret(req.body.national_id, req.body.face_verification_secret);
+        if (!isValidFaceSecret) {
             res.status(StatusCodes.UNAUTHORIZED).json({
                 message: 'Invalid or expired face verification. Please complete ID verification again.'
+            });
+            return;
+        }
+
+        // OTP verification is also required for regular voters
+        if (!req.body.otp_verification_secret) {
+            res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'Phone verification is required. Please complete OTP verification first.'
+            });
+            return;
+        }
+
+        // Validate the OTP verification secret
+        const isValidOtpSecret = otpVerificationService.validateSecret(req.body.phone, req.body.otp_verification_secret);
+        if (!isValidOtpSecret) {
+            res.status(StatusCodes.UNAUTHORIZED).json({
+                message: 'Invalid or expired phone verification. Please complete OTP verification again.'
             });
             return;
         }
@@ -61,7 +79,7 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             });
             return;
         }
-        
+
         // Check if phone number is already in use - fast lookup using SHA-256 hashes
         const isPhoneInUse = await userService.isPhoneNumberInUse(req.body.phone);
         if (isPhoneInUse) {
@@ -70,7 +88,7 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             });
             return;
         }
-        
+
         // Create unique ID for the new user
         const user_id = crypto.randomUUID(); // voterId
 
@@ -112,8 +130,8 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
         });
 
         // try {
-            // Directly save to MongoDB - more efficient than going through userService
-            await userData.save();
+        // Directly save to MongoDB - more efficient than going through userService
+        await userData.save();
         // } catch (dbError: any) {
         //     // Handle MongoDB duplicate key errors with specific error messages
         //     if (dbError.code === 11000) {
@@ -164,14 +182,38 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
 }
 
 const sendOtp = async (req: Request, res: Response) => {
-    const { phoneNumber } = req.body;
-    if (!phoneNumber || !verifyPhoneNumber(phoneNumber))
+    const { phone } = req.body;
+    if (!phone || !verifyPhoneNumber(phone))
         throw new BadRequestError("InValid Phone Number");
     const twilioResponse: {
         success: boolean;
         expiresAt?: Date;
         message: string
-    } = await twilioService.createAndSendOTP(phoneNumber)
+    } = await twilioService.createAndSendOTP(phone);
+
+    if (!twilioResponse.success) {
+        res.status(StatusCodes.BAD_REQUEST).json({
+            message: twilioResponse
+        });
+        return;
+    }
+
+    res.status(StatusCodes.OK).json({
+        message: twilioResponse.message
+    });
+}
+
+const resendOtp = async (req: Request, res: Response) => {
+    const { phone } = req.body;
+    if (!phone || !verifyPhoneNumber(phone))
+        throw new BadRequestError("InValid Phone Number");
+
+    const twilioResponse: {
+        success: boolean;
+        expiresAt?: Date;
+        message: string
+    } = await twilioService.resendOTP(phone);
+
     if (!twilioResponse.success) {
         res.status(StatusCodes.BAD_REQUEST).json({
             message: twilioResponse
@@ -183,42 +225,30 @@ const sendOtp = async (req: Request, res: Response) => {
     })
 }
 
-const resendOtp = async (req: Request, res: Response) => {
-    const { phoneNumber } = req.body;
-    if (!phoneNumber || !verifyPhoneNumber(phoneNumber))
-        throw new BadRequestError("InValid Phone Number");
-    const twilioResponse: {
-        success: boolean;
-        expiresAt?: Date;
-        message: string
-    } = await twilioService.resendOTP(phoneNumber)
-    if (!twilioResponse.success) {
-        res.status(StatusCodes.BAD_REQUEST).json({
-            message: twilioResponse
-        })
-        return
-    }
-    res.status(StatusCodes.OK).json({
-        message: twilioResponse.message
-    })
-}
 const verifyOtp = async (req: Request, res: Response) => {
-    const { phoneNumber, otp } = req.body;
-    if (!otp || !phoneNumber || !verifyPhoneNumber(phoneNumber))
+    const { phone, otp } = req.body;
+    if (!otp || !phone || !verifyPhoneNumber(phone))
         throw new BadRequestError("Missing input fields");
+
     const twilioResponse: {
         success: boolean;
         message: string
-    } = await twilioService.verifyOTP(phoneNumber, otp)
+    } = await twilioService.verifyOTP(phone, otp);
+
     if (!twilioResponse.success) {
         res.status(StatusCodes.BAD_REQUEST).json({
             message: twilioResponse
-        })
-        return
+        });
+        return;
     }
+
+    // Generate OTP verification secret after successful verification
+    const verificationSecret = otpVerificationService.generateSecret(phone);
+
     res.status(StatusCodes.OK).json({
-        message: twilioResponse.message
-    })
+        message: twilioResponse.message,
+        otp_verification_secret: verificationSecret
+    });
 }
 
 

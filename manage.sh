@@ -60,7 +60,20 @@ function restart() {
     build
 }
 
-if [ "$1" == "build" ]; then
+function start() {
+    # Navigate to the hyperledger-fabric network directory
+    cd hyperledger-fabric/network
+
+    # Start the network
+    ./network.sh up
+
+    cd ../../application
+    ./mongo.sh start
+}
+
+if [ "$1" == "start" ]; then
+    start
+elif [ "$1" == "build" ]; then
     build
 elif [ "$1" == "clean" ]; then
     clean

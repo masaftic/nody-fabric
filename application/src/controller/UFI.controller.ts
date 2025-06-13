@@ -57,13 +57,19 @@ const verifyUserFace = async (req: Request, res: Response) => {
     const response: string = await flaskService.verifyFace(embedding1, embedding2)
     console.log(`response from controller --> ${response}`)
     if (!response) {
-
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
             message: "Failed to verify face"
         })
         return;
     }
-    
+
+    if (response == "false") {
+        res.status(StatusCodes.OK).json({
+            message: response,
+        })
+        return;
+    }
+
     const verificationSecret = faceVerificationService.generateSecret();
     res.status(StatusCodes.OK).json({
         message: response,
@@ -81,7 +87,7 @@ const extractUserInfo = async (req: Request, res: Response) => {
     const frontImagePath = req.files.front[0].path; // Using [0] because it's an array
     const backImagePath = req.files.back[0].path;
 
-    // const response = await flaskService.processCardId(frontImagePath, backImagePath)
+    const response = await flaskService.processCardId(frontImagePath, backImagePath)
 
     if (!response) {
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({

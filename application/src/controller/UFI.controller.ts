@@ -63,8 +63,11 @@ const verifyUserFace = async (req: Request, res: Response) => {
         })
         return;
     }
+    
+    const verificationSecret = faceVerificationService.generateSecret();
     res.status(StatusCodes.OK).json({
-        message: response
+        message: response,
+        face_verification_secret: verificationSecret
     })
 }
 
@@ -97,16 +100,11 @@ const extractUserInfo = async (req: Request, res: Response) => {
     // }
 
     // Generate face verification secret if national ID is present in the response
-    let verificationSecret = null;
-    if (response.data && response.data.id) {
-        verificationSecret = faceVerificationService.generateSecret(response.data.id);
-    }
 
     res.status(StatusCodes.OK).json({
         message: "Operation Done",
-        data: response,
-        face_verification_secret: verificationSecret
-    })
+        data: response
+    });
 }
 export {
     getUserFaceEmbedding,

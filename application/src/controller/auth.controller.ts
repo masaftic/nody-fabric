@@ -44,7 +44,7 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
         }
 
         // Validate the face verification secret
-        const isValidFaceSecret = faceVerificationService.validateSecret(req.body.national_id, req.body.face_verification_secret);
+        const isValidFaceSecret = faceVerificationService.validateSecret(req.body.face_verification_secret);
         if (!isValidFaceSecret) {
             res.status(StatusCodes.UNAUTHORIZED).json({
                 message: 'Invalid or expired face verification. Please complete ID verification again.'

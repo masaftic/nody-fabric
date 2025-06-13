@@ -2,8 +2,7 @@ import crypto from 'crypto';
 import { logger } from '../logger';
 
 interface FaceVerificationSecretStore {
-    [nationalId: string]: {
-        secret: string;
+    [secret: string]: {
         expiresAt: Date;
     };
 }
@@ -21,22 +20,21 @@ class FaceVerificationService {
      * @param nationalId The national ID to generate a secret for
      * @returns The generated secret
      */
-    generateSecret(nationalId: string): string {
+    generateSecret(): string {
         // Generate a random secret with nationalId as part of input
         const secret = crypto.createHash('sha256')
-            .update(`${nationalId}-${Date.now()}-${crypto.randomBytes(32).toString('hex')}`)
+            .update(`${Date.now()}-${crypto.randomBytes(32).toString('hex')}`)
             .digest('hex');
 
         // Store the secret with expiration
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + this.SECRET_EXPIRY_HOURS);
         
-        this.secretStore[nationalId] = {
-            secret,
+        this.secretStore[secret] = {
             expiresAt
         };
         
-        logger.info(`Generated face verification secret for national ID: ${nationalId}`);
+        logger.info(`Generated face verification secret`);
         return secret;
     }
 
@@ -46,31 +44,25 @@ class FaceVerificationService {
      * @param secret The secret to validate
      * @returns True if valid, false otherwise
      */
-    validateSecret(nationalId: string, secret: string): boolean {
-        const storedData = this.secretStore[nationalId];
+    validateSecret(secret: string): boolean {
+        const storedData = this.secretStore[secret];
         
         // No stored secret for this nationalId
         if (!storedData) {
-            logger.warn(`Face verification failed: No secret found for national ID: ${nationalId}`);
+            logger.warn(`Face verification failed: No secret found for ${secret}`);
             return false;
         }
         
         // Secret expired
         if (new Date() > storedData.expiresAt) {
-            logger.warn(`Face verification failed: Secret expired for national ID: ${nationalId}`);
-            delete this.secretStore[nationalId]; // Clean up expired secret
-            return false;
-        }
-        
-        // Secret doesn't match
-        if (storedData.secret !== secret) {
-            logger.warn(`Face verification failed: Invalid secret for national ID: ${nationalId}. Provided: ${secret.substring(0,10)}..., Expected: ${storedData.secret.substring(0,10)}...`);
+            logger.warn(`Face verification failed: Secret expired secret ${secret}`);
+            delete this.secretStore[secret]; // Clean up expired secret
             return false;
         }
         
         // Valid secret - remove it after use to prevent reuse
-        logger.info(`Face verification successful for national ID: ${nationalId}`);
-        delete this.secretStore[nationalId];
+        logger.info(`Face verification successful for secret: ${secret}`);
+        delete this.secretStore[secret];
         return true;
     }
 }

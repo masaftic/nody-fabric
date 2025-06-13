@@ -239,7 +239,7 @@ export class FabricEventService {
         }
       ],
       start_time: new Date().toISOString(),
-      end_time: new Date(Date.now() + 70000).toISOString(), // 1 day later
+      end_time: new Date(Date.now() + 1000000).toISOString(), // 1 day later
       eligible_governorates: [...Governorates], // Example governorates
       election_image: 'uploads/21357_pri_boardelections_hero_777797.png' // URL to election image
     };

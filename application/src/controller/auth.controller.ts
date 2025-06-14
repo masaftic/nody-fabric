@@ -8,6 +8,7 @@ import BadRequestError from "../errors/BadRequest.error";
 import { userService } from '../service/user.service';
 import { faceVerificationService } from '../service/face-verification.service';
 import { otpVerificationService } from '../service/otp-verification.service';
+import { authChallengeService } from '../service/auth-challenge.service';
 import UserModel, { UserRegisterRequest, UserRole } from '../models/user.model';
 import { fabricAdminConnection, fabricConnection, withFabricAdminConnection } from "../fabric-utils/fabric";
 import { BlockChainRepository } from "../fabric-utils/BlockChainRepository";
@@ -34,41 +35,41 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
     }
 
     // Bypass all verification checks if invitation code is provided
-    if (!req.body.invitation_code) {
-        // Face verification is required for regular voters
-        if (!req.body.face_verification_secret) {
-            res.status(StatusCodes.BAD_REQUEST).json({
-                message: 'Face verification is required. Please complete ID verification first.'
-            });
-            return;
-        }
+    // if (!req.body.invitation_code) {
+    //     // Face verification is required for regular voters
+    //     if (!req.body.face_verification_secret) {
+    //         res.status(StatusCodes.BAD_REQUEST).json({
+    //             message: 'Face verification is required. Please complete ID verification first.'
+    //         });
+    //         return;
+    //     }
 
-        // Validate the face verification secret
-        const isValidFaceSecret = faceVerificationService.validateSecret(req.body.face_verification_secret);
-        if (!isValidFaceSecret) {
-            res.status(StatusCodes.UNAUTHORIZED).json({
-                message: 'Invalid or expired face verification. Please complete ID verification again.'
-            });
-            return;
-        }
+    //     // Validate the face verification secret
+    //     const isValidFaceSecret = faceVerificationService.validateSecret(req.body.face_verification_secret);
+    //     if (!isValidFaceSecret) {
+    //         res.status(StatusCodes.UNAUTHORIZED).json({
+    //             message: 'Invalid or expired face verification. Please complete ID verification again.'
+    //         });
+    //         return;
+    //     }
 
-        // OTP verification is also required for regular voters
-        if (!req.body.otp_verification_secret) {
-            res.status(StatusCodes.BAD_REQUEST).json({
-                message: 'Phone verification is required. Please complete OTP verification first.'
-            });
-            return;
-        }
+    //     // OTP verification is also required for regular voters
+    //     if (!req.body.otp_verification_secret) {
+    //         res.status(StatusCodes.BAD_REQUEST).json({
+    //             message: 'Phone verification is required. Please complete OTP verification first.'
+    //         });
+    //         return;
+    //     }
 
-        // Validate the OTP verification secret
-        const isValidOtpSecret = otpVerificationService.validateSecret(req.body.phone, req.body.otp_verification_secret);
-        if (!isValidOtpSecret) {
-            res.status(StatusCodes.UNAUTHORIZED).json({
-                message: 'Invalid or expired phone verification. Please complete OTP verification again.'
-            });
-            return;
-        }
-    }
+    //     // Validate the OTP verification secret
+    //     const isValidOtpSecret = otpVerificationService.validateSecret(req.body.phone, req.body.otp_verification_secret);
+    //     if (!isValidOtpSecret) {
+    //         res.status(StatusCodes.UNAUTHORIZED).json({
+    //             message: 'Invalid or expired phone verification. Please complete OTP verification again.'
+    //         });
+    //         return;
+    //     }
+    // }
 
     try {
         // Check if national ID is already in use - fast lookup using SHA-256 hashes
@@ -252,7 +253,116 @@ const verifyOtp = async (req: Request, res: Response) => {
 }
 
 
-export async function login(req: Request, res: Response) {
+/**
+ * Get a login challenge for secure authentication
+ * Step 1 of challenge-based login
+ */
+export async function getLoginChallenge(req: Request, res: Response) {
+    const { user_id } = req.body;
+    
+    if (!user_id) {
+        res.status(StatusCodes.BAD_REQUEST).json({
+            message: 'Missing user ID'
+        });
+        return;
+    }
+
+    // Make sure the user exists
+    const user = await userService.getUserById(user_id);
+    if (!user) {
+        res.status(StatusCodes.NOT_FOUND).json({ 
+            message: 'User not found' 
+        });
+        return;
+    }
+
+    // Generate a random challenge for this user
+    const challenge = authChallengeService.generateChallenge(user_id);
+
+    res.status(StatusCodes.OK).json({
+        message: 'Login challenge generated',
+        challenge,
+        user_id
+    });
+}
+
+/**
+ * Verify a signed challenge and issue JWT token
+ * Step 2 of challenge-based login
+ */
+export async function verifyChallenge(req: Request, res: Response) {
+    const { user_id, challenge, signature } = req.body;
+    
+    if (!user_id || !challenge || !signature) {
+        res.status(StatusCodes.BAD_REQUEST).json({
+            message: 'Missing required fields'
+        });
+        return;
+    }
+
+    // Make sure the user exists
+    const user = await userService.getUserById(user_id);
+    if (!user) {
+        res.status(StatusCodes.NOT_FOUND).json({ 
+            message: 'User not found' 
+        });
+        return;
+    }
+
+    // Verify that the challenge is valid
+    if (!authChallengeService.verifyChallenge(user_id, challenge)) {
+        res.status(StatusCodes.UNAUTHORIZED).json({
+            message: 'Invalid or expired challenge'
+        });
+        return;
+    }
+
+    try {
+        // Get the user's certificate from the database
+        const certificate = user.certificate;
+        
+        // Create public key from certificate
+        const publicKey = crypto.createPublicKey(certificate);
+        
+        // Verify the signature
+        const isSignatureValid = crypto.verify(
+            'sha256',                                    // Algorithm
+            Buffer.from(challenge, 'hex'),               // Challenge as buffer
+            publicKey,                                   // Public key from certificate
+            Buffer.from(signature, 'base64')             // Signature as buffer
+        );
+
+        if (!isSignatureValid) {
+            res.status(StatusCodes.UNAUTHORIZED).json({
+                message: 'Invalid signature'
+            });
+            return;
+        }
+
+        // Signature is valid, issue JWT token
+        const access_token = generateToken({
+            user_id: user.userId,
+            role: user.role,
+            governorate: user.governorate,
+        });
+
+        res.status(StatusCodes.OK).json({
+            message: 'Login successful',
+            access_token,
+        });
+    } catch (error) {
+        console.error('Error verifying signature:', error);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: 'Error verifying signature'
+        });
+    }
+}
+
+/**
+ * Legacy phone-based login (fallback method)
+ * @deprecated Use challenge-based login instead
+ */
+export async function loginWithPhone(req: Request, res: Response) {
     // Temporarily using phone number for login.
     // Instead of a sign challenge with the private key of the user.
 
@@ -283,6 +393,7 @@ export async function login(req: Request, res: Response) {
 
 export {
     register as userRegister, sendOtp as sendSmsOtp,
-    resendOtp as resendSmsOtp, verifyOtp as verifySmsOtp
+    resendOtp as resendSmsOtp, verifyOtp as verifySmsOtp,
+    loginWithPhone as login, // Backward compatibility
 }
 

@@ -99,3 +99,44 @@ Response:
     "otp_verification_secret": "x1y2z3..." // This secret must be used in the registration request
 }
 ```
+
+## `POST /api/v1/auth/login/challenge` (Step 1 of challenge-based login)
+
+Request:
+
+```json
+{
+    "user_id": "fa8c4d9e-1234-5678-9abc-def123456789"
+}
+```
+
+Response:
+
+```json
+{
+    "message": "Login challenge generated",
+    "challenge": "a1b2c3d4e5f6...", // Hex-encoded random challenge that must be signed
+    "user_id": "fa8c4d9e-1234-5678-9abc-def123456789"
+}
+```
+
+## `POST /api/v1/auth/login/verify` (Step 2 of challenge-based login)
+
+Request:
+
+```json
+{
+    "user_id": "fa8c4d9e-1234-5678-9abc-def123456789",
+    "challenge": "a1b2c3d4e5f6...", // The challenge received in step 1
+    "signature": "base64_encoded_signature" // Base64-encoded signature of the challenge
+}
+```
+
+Response:
+
+```json
+{
+    "message": "Login successful",
+    "access_token": "string" // JWT token. contains: user_id, role, governorate
+}
+```

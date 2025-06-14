@@ -16,6 +16,7 @@ import { generateToken } from '../utils/jwt.utils';
 import crypto from 'crypto';
 import { invitationService } from "../service/invitation.service";
 import { Governorates } from "../models/election.model";
+import { logger } from "../logger";
 
 
 
@@ -259,7 +260,7 @@ const verifyOtp = async (req: Request, res: Response) => {
  */
 export async function getLoginChallenge(req: Request, res: Response) {
     const { user_id } = req.body;
-    
+
     if (!user_id) {
         res.status(StatusCodes.BAD_REQUEST).json({
             message: 'Missing user ID'
@@ -270,8 +271,8 @@ export async function getLoginChallenge(req: Request, res: Response) {
     // Make sure the user exists
     const user = await userService.getUserById(user_id);
     if (!user) {
-        res.status(StatusCodes.NOT_FOUND).json({ 
-            message: 'User not found' 
+        res.status(StatusCodes.NOT_FOUND).json({
+            message: 'User not found'
         });
         return;
     }
@@ -292,7 +293,7 @@ export async function getLoginChallenge(req: Request, res: Response) {
  */
 export async function verifyChallenge(req: Request, res: Response) {
     const { user_id, challenge, signature } = req.body;
-    
+
     if (!user_id || !challenge || !signature) {
         res.status(StatusCodes.BAD_REQUEST).json({
             message: 'Missing required fields'
@@ -303,8 +304,8 @@ export async function verifyChallenge(req: Request, res: Response) {
     // Make sure the user exists
     const user = await userService.getUserById(user_id);
     if (!user) {
-        res.status(StatusCodes.NOT_FOUND).json({ 
-            message: 'User not found' 
+        res.status(StatusCodes.NOT_FOUND).json({
+            message: 'User not found'
         });
         return;
     }
@@ -320,24 +321,31 @@ export async function verifyChallenge(req: Request, res: Response) {
     try {
         // Get the user's certificate from the database
         const certificate = user.certificate;
-        
+
         // Create public key from certificate
         const publicKey = crypto.createPublicKey(certificate);
-        
+
         // Verify the signature
+        // First, hash the challenge as we're verifying a signature of the challenge hash
+        const challengeBuffer = Buffer.from(challenge, 'hex');
+        const hash = crypto.createHash('sha256').update(challengeBuffer).digest();
+
         const isSignatureValid = crypto.verify(
-            'sha256',                                    // Algorithm
-            Buffer.from(challenge, 'hex'),               // Challenge as buffer
+            'sha256',                                    // Hash algorithm
+            hash,                                        // Hash of the challenge
             publicKey,                                   // Public key from certificate
             Buffer.from(signature, 'base64')             // Signature as buffer
         );
 
-        if (!isSignatureValid) {
+        if (isSignatureValid) {
+            logger.error(`Signature validation failed for user ${user_id}`);
             res.status(StatusCodes.UNAUTHORIZED).json({
                 message: 'Invalid signature'
             });
             return;
         }
+
+        logger.info(`Signature validation successful for user ${user_id}`);
 
         // Signature is valid, issue JWT token
         const access_token = generateToken({
@@ -357,7 +365,7 @@ export async function verifyChallenge(req: Request, res: Response) {
         });
     }
 }
-
+    
 /**
  * Legacy phone-based login (fallback method)
  * @deprecated Use challenge-based login instead

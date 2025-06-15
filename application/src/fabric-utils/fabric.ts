@@ -28,13 +28,13 @@ async function userSigner(userId: string, useRemoteSigning: boolean = false): Pr
         const privateKeyPEM = await fs.readFile(keyPath);
 
         return async (digest: Uint8Array): Promise<Uint8Array> => {
-            logger.info('Local signer: Signing digest');
+            // logger.info('Local signer: Signing digest');
 
             const privateKey = crypto.createPrivateKey(privateKeyPEM);
             const signer = signers.newPrivateKeySigner(privateKey);
             const signature = await signer(digest);
 
-            logger.info('Local signer: Generated signature');
+            // logger.info('Local signer: Generated signature');
 
             return signature;
         }
@@ -42,7 +42,7 @@ async function userSigner(userId: string, useRemoteSigning: boolean = false): Pr
 
     // For remote signing
     return async (digest: Uint8Array): Promise<Uint8Array> => {
-        logger.info(`Remote signer: Requesting signature for user ${userId}`);
+        // logger.info(`Remote signer: Requesting signature for user ${userId}`);
 
         // Track signing request count for this user
         if (!global.signingRequests) {
@@ -56,7 +56,7 @@ async function userSigner(userId: string, useRemoteSigning: boolean = false): Pr
         // The actual remote signing logic will be handled by the Socket.IO service
         const signature = await requestRemoteSignature(userId, digest);
 
-        logger.info(`Remote signer: Received signature for user ${userId} (request #${global.signingRequests[userId]})`);
+        // logger.info(`Remote signer: Received signature for user ${userId} (request #${global.signingRequests[userId]})`);
 
         return signature;
     }
@@ -91,8 +91,8 @@ async function requestRemoteSignature(userId: string, digest: Uint8Array): Promi
 
         // Register handler for this signing request
         registerSigningHandler(requestId, (data) => {
-            logger.info(`Received remote signing response for request ${requestId}`);
-            logger.debug(`Remote signing response data: ${JSON.stringify(data)}`);
+            // logger.info(`Received remote signing response for request ${requestId}`);
+            // logger.debug(`Remote signing response data: ${JSON.stringify(data)}`);
 
             clearTimeout(timeout);
 
@@ -109,7 +109,7 @@ async function requestRemoteSignature(userId: string, digest: Uint8Array): Promi
             }
         });
 
-        logger.debug(`digest: ${digest}`);
+        // logger.debug(`digest: ${digest}`);
 
         // Emit the signing request to the client
         global.socketService.emit('signing-request', {
@@ -118,7 +118,7 @@ async function requestRemoteSignature(userId: string, digest: Uint8Array): Promi
             digest: Buffer.from(digest).toString('base64')
         });
 
-        logger.info(`Sent signing request ${requestId} for user ${userId}`);
+        // logger.info(`Sent signing request ${requestId} for user ${userId}`);
     });
 }
 
@@ -128,13 +128,13 @@ async function adminSigner(): Promise<Signer> {
     const privateKeyPEM = await fs.readFile(keyPath);
 
     return async (digest: Uint8Array): Promise<Uint8Array> => {
-        logger.info('Admin signer: Signing digest');
+        // logger.info('Admin signer: Signing digest');
 
         const privateKey = crypto.createPrivateKey(privateKeyPEM);
         const signer = signers.newPrivateKeySigner(privateKey);
         const signature = await signer(digest);
 
-        logger.info('Admin signer: Generated signature');
+        // logger.info('Admin signer: Generated signature');
 
         return signature;
     }

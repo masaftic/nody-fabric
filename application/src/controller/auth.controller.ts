@@ -17,6 +17,7 @@ import crypto from 'crypto';
 import { invitationService } from "../service/invitation.service";
 import { Governorates } from "../models/election.model";
 import { logger } from "../logger";
+import { stat } from "fs";
 
 
 
@@ -36,41 +37,24 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
     }
 
     // Bypass all verification checks if invitation code is provided
-    // if (!req.body.invitation_code) {
-    //     // Face verification is required for regular voters
-    //     if (!req.body.face_verification_secret) {
-    //         res.status(StatusCodes.BAD_REQUEST).json({
-    //             message: 'Face verification is required. Please complete ID verification first.'
-    //         });
-    //         return;
-    //     }
+    if (!req.body.invitation_code) {
+        // Face verification is required for regular voters
+        // if (!req.body.face_verification_secret) {
+        //     res.status(StatusCodes.BAD_REQUEST).json({
+        //         message: 'Face verification is required. Please complete ID verification first.'
+        //     });
+        //     return;
+        // }
 
-    //     // Validate the face verification secret
-    //     const isValidFaceSecret = faceVerificationService.validateSecret(req.body.face_verification_secret);
-    //     if (!isValidFaceSecret) {
-    //         res.status(StatusCodes.UNAUTHORIZED).json({
-    //             message: 'Invalid or expired face verification. Please complete ID verification again.'
-    //         });
-    //         return;
-    //     }
-
-    //     // OTP verification is also required for regular voters
-    //     if (!req.body.otp_verification_secret) {
-    //         res.status(StatusCodes.BAD_REQUEST).json({
-    //             message: 'Phone verification is required. Please complete OTP verification first.'
-    //         });
-    //         return;
-    //     }
-
-    //     // Validate the OTP verification secret
-    //     const isValidOtpSecret = otpVerificationService.validateSecret(req.body.phone, req.body.otp_verification_secret);
-    //     if (!isValidOtpSecret) {
-    //         res.status(StatusCodes.UNAUTHORIZED).json({
-    //             message: 'Invalid or expired phone verification. Please complete OTP verification again.'
-    //         });
-    //         return;
-    //     }
-    // }
+        // // Validate the face verification secret
+        // const isValidFaceSecret = faceVerificationService.validateSecret(req.body.face_verification_secret);
+        // if (!isValidFaceSecret) {
+        //     res.status(StatusCodes.UNAUTHORIZED).json({
+        //         message: 'Invalid or expired face verification. Please complete ID verification again.'
+        //     });
+        //     return;
+        // }
+    }
 
     try {
         // Check if national ID is already in use - fast lookup using SHA-256 hashes
@@ -130,32 +114,33 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
             role: role,
             status: 'active',
         });
+   
+        try {
+            await userData.validate();
+        } catch (dbError: any) {
+            if (dbError.errors.phone) {
+                res.status(StatusCodes.BAD_REQUEST).json({
+                    message: 'Invalid phone number format'
+                });
+                return;
+            }
+            else if (dbError.errors.nationalId) {
+                res.status(StatusCodes.BAD_REQUEST).json({
+                    message: 'Invalid national id'
+                });
+                return;
+            }
+            else {
+                logger.error(`Validation error while registering user: ${JSON.stringify(dbError)}`);
+                res.status(StatusCodes.BAD_REQUEST).json({
+                    message: 'Invalid user data'
+                });
+                return;
+            }
+        }
 
-        // try {
-        // Directly save to MongoDB - more efficient than going through userService
+
         await userData.save();
-        // } catch (dbError: any) {
-        //     // Handle MongoDB duplicate key errors with specific error messages
-        //     if (dbError.code === 11000) {
-        //         // Extract the duplicate field name from the error message
-        //         const field = Object.keys(dbError.keyPattern)[0];
-        //         if (field === 'nationalId') {
-        //             res.status(StatusCodes.CONFLICT).json({
-        //                 message: 'National ID already registered'
-        //             });
-        //         } else if (field === 'phone') {
-        //             res.status(StatusCodes.CONFLICT).json({
-        //                 message: 'Phone number already registered'
-        //             });
-        //         } else {
-        //             res.status(StatusCodes.CONFLICT).json({
-        //                 message: 'User already exists'
-        //             });
-        //         }
-        //         return;
-        //     }
-        //     throw dbError; // Re-throw if not a duplicate key error
-        // }
 
         await withFabricAdminConnection(async (contract) => {
             const blockchainRepo = new BlockChainRepository(contract);
@@ -179,6 +164,74 @@ async function register(req: Request<{}, {}, UserRegisterRequest>, res: Response
     } catch (error: any) {
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
             message: `Error registering user: ${error.message}}`
+        });
+    }
+}
+
+export async function reRegister(req: Request, res: Response) {
+    if (!req.body.national_id) {
+        res.status(StatusCodes.BAD_REQUEST).json({
+            message: 'Missing required fields'
+        });
+        return;
+    }
+
+    // Check if national ID is already in use - fast lookup using SHA-256 hashes
+    const isNationalIdInUse = await userService.isNationalIdInUse(req.body.national_id);
+    if (!isNationalIdInUse) {
+        res.status(StatusCodes.CONFLICT).json({
+            message: 'No user found with this national ID'
+        });
+        return;
+    }
+
+    const user = await userService.findUserByNationalId(req.body.national_id);
+    if (!user) {
+        res.status(StatusCodes.NOT_FOUND).json({
+            message: 'User not found'
+        });
+        return;
+    }
+    
+    if (!req.body.face_verification_secret) {
+        res.status(StatusCodes.BAD_REQUEST).json({
+            message: 'Face verification is required. Please complete ID verification first.'
+        });
+        return;
+    }
+
+    const isValidFaceSecret = faceVerificationService.validateSecret(req.body.face_verification_secret);
+    if (!isValidFaceSecret) {
+        res.status(StatusCodes.UNAUTHORIZED).json({
+            message: 'Invalid or expired face verification. Please complete ID verification again.'
+        });
+        return;
+    }
+
+    try {
+        const identityManager = new IdentityManager();
+        const [cert, private_key] = await identityManager.loadUserCredentials(user.userId);
+        if (!cert || !private_key) {
+            res.status(StatusCodes.NOT_FOUND).json({
+                message: 'User credentials not found'
+            });
+            return;
+        }
+
+        res.status(StatusCodes.OK).json({
+            message: 'User re-registered successfully',
+            user_id: user.userId,
+            access_token: generateToken({
+                user_id: user.userId,
+                role: user.role,
+                governorate: user.governorate,
+            }),
+            certificate: cert,
+            private_key: private_key,
+        });
+    } catch (error: any) {
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: `Error re-registering user: ${error.message}}`
         });
     }
 }
@@ -365,7 +418,7 @@ export async function verifyChallenge(req: Request, res: Response) {
         });
     }
 }
-    
+
 /**
  * Legacy phone-based login (fallback method)
  * @deprecated Use challenge-based login instead

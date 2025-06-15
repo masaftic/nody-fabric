@@ -28,10 +28,9 @@ func (s *VotingContract) CastVote(ctx contractapi.TransactionContextInterface, v
 		return "", err
 	}
 
-	// TODO: Check if the election is live. commented until cron jobs.
-	// if election.Status != "live" {
-	// 	return "", fmt.Errorf("the election %s is not live", electionID)
-	// }
+	if election.Status != "live" {
+		return "", fmt.Errorf("the election %s is not live", electionID)
+	}
 
 	// Get voter ID by extracting CN from client identity
 	voterId, err := getUserId(ctx)

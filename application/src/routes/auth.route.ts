@@ -1,5 +1,5 @@
 import { NextFunction, Router, Request, Response } from "express";
-import { getLoginChallenge, login, resendSmsOtp, sendSmsOtp, userRegister, verifyChallenge, verifySmsOtp } from "../controller/auth.controller";
+import { getLoginChallenge, login, reRegister, resendSmsOtp, sendSmsOtp, userRegister, verifyChallenge, verifySmsOtp } from "../controller/auth.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { UserRole } from "../models/user.model";
 import multer, { Multer } from "multer"
@@ -10,6 +10,7 @@ import { upload } from "./uploads.route";
 const router = Router()
 
 router.post('/register', userRegister)
+router.post('/reregister', reRegister) // Legacy endpoint for re-registration
 router.post('/login', login) // Legacy phone-based login
 router.post('/login/challenge', getLoginChallenge) // Step 1: Get challenge
 router.post('/login/verify', verifyChallenge) // Step 2: Verify signed challenge

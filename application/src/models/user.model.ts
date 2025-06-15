@@ -18,7 +18,7 @@ export interface IUser extends Document {
     isVerified?: boolean;
     verifyCode?: string;
     verifyCodeExpireOn?: Date;
-    certificate: string; 
+    certificate: string;
     governorate: Governorate;
     role: UserRole;
     status: "active" | "suspended";
@@ -58,12 +58,10 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
         validate: [
             {
                 // Validate before saving/hashing (for new records)
-                validator: function(this: any, v: string) {
-                    return true; // for now
-
+                validator: function (this: any, v: string) {
                     // Skip validation if the value is already hashed (when reading from DB)
                     if (v && v.startsWith('$2')) return true;
-                    
+
                     // Check if the national ID is a valid Egyptian national ID
                     if (!v) return false;
                     // Check length
@@ -71,17 +69,18 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
                     // Check if all characters are digits
                     if (!/^\d+$/.test(v)) return false;
                     // Check the last digit (checksum)
-                    const weights = [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1];
-                    const sum = v
-                        .slice(0, 12)
-                        .split('')
-                        .map((digit, index) => {
-                            const num = parseInt(digit, 10);
-                            return (num * weights[index]) % 10 + Math.floor((num * weights[index]) / 10);
-                        })
-                        .reduce((acc, curr) => acc + curr, 0);
-                    const checksum = (10 - (sum % 10)) % 10;
-                    return checksum === parseInt(v[13], 10);
+                    const weights = [2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+                    const digits = v.split('').map(Number);
+
+                    let sum = 0;
+                    for (let i = 0; i < 13; i++) {
+                        sum += digits[i] * weights[i];
+                    }
+
+                    const mod = sum % 11;
+                    const checkDigit = (11 - mod) % 10;
+
+                    return checkDigit === digits[13];
                 },
                 message: "Invalid National ID format or checksum"
             }
@@ -99,10 +98,10 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>({
         required: true,
         // Remove unique constraint as it won't work with randomly salted hashes
         validate: {
-            validator: function(this: any, v: string) {
+            validator: function (this: any, v: string) {
                 // Skip validation if the value is already hashed (when reading from DB)
                 if (v && v.startsWith('$2')) return true;
-                
+
                 // Validate phone number format
                 return /^(?:\+20|0)?(1[0-9]{9}|2[0-9]{8,9}|(10|11|12|15)[0-9]{8})$/.test(v);
             },
@@ -188,7 +187,7 @@ userSchema.pre('save', async function (next) {
         // Store original national ID for age calculation
         let originalNationalId: string | null = null;
         let originalPhone: string | null = null;
-        
+
         // Only hash values if they are new or modified, and only if they don't already look like hashes
         if (this.isNew || this.isModified("nationalId") || this.isModified("phone")) {
             const salt = await bcryptjs.genSalt(10);
@@ -196,12 +195,12 @@ userSchema.pre('save', async function (next) {
             if (this.nationalId && !this.nationalId.startsWith('$2')) {
                 // Preserve the original national ID for age calculation and unique hash
                 originalNationalId = this.nationalId;
-                
+
                 // Create a deterministic hash for uniqueness checks (SHA-256)
                 this.nationalIdUnique = crypto.createHash('sha256')
                     .update(originalNationalId)
                     .digest('hex');
-                
+
                 // Use bcrypt for the actual storage (security)
                 this.nationalId = await bcryptjs.hash(originalNationalId, salt);
             }
@@ -209,16 +208,16 @@ userSchema.pre('save', async function (next) {
             if (this.phone && !this.phone.startsWith('$2')) {
                 // Preserve original phone for unique hash
                 originalPhone = this.phone;
-                
+
                 // Create a deterministic hash for uniqueness checks (SHA-256)
                 this.phoneUnique = crypto.createHash('sha256')
                     .update(originalPhone)
                     .digest('hex');
-                
+
                 // Use bcrypt for the actual storage (security)
                 this.phone = await bcryptjs.hash(originalPhone, salt);
             }
-            
+
             // Extract age from National ID during user creation
             if (originalNationalId) {
                 const birthdate = extractBirthdateFromNationalId(originalNationalId);
@@ -228,7 +227,7 @@ userSchema.pre('save', async function (next) {
                 }
             }
         }
-        
+
         next();
     }
     catch (error) {

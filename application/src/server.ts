@@ -23,7 +23,7 @@ export const createServerApp = async () => {
 
     const rateLimiter = rateLimit({
         windowMs: 15 * 60 * 1000, // 15 minutes
-        max: 100, // Limit each IP to 100 requests per windowMs
+        max: 400, // Limit each IP to 100 requests per windowMs
         standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
         legacyHeaders: false, // Disable the `X-RateLimit-*` headers
         message: {
@@ -72,7 +72,8 @@ export const createServerApp = async () => {
             try
             {
                 const eventService = initFabricEventService(network);
-                await eventService.createSampleElection();
+                // await eventService.createSampleElection();
+                await eventService.seedInitialElections();
                 await eventService.startListening();
                 logger.info('Fabric event service initialized and started');
             } catch (error) {

@@ -246,29 +246,96 @@ export class FabricEventService {
 
     const blockchainRepo = new BlockChainRepository(this.contract);
     await blockchainRepo.createElection(sampleElection);
+
+
   }
 
   /**
    * Verify blockchain elections integrity
    */
-  private async verifyBlockchainElections(): Promise<void> {
+  async seedInitialElections(): Promise<void> {
     const blockchainRepo = new BlockChainRepository(this.contract);
 
     // Get all elections
     let elections = await blockchainRepo.getAllElections();
 
-    if (elections.length === 0) {
-      logger.info('No elections found on the blockchain');
+    if (elections.length != 0) {
       return;
     }
 
-    // Verify elections and compute tallies if needed
-    for (const election of elections) {
-      // Compute the current tally for the election (optional, can be commented out)
-      await blockchainRepo.computeVoteTally(crypto.randomUUID(), election.election_id);
-    }
+    const sampleElection: CreateElectionRequest = {
+      name: 'الانتخابات الرئاسية المصرية 2025',
+      description: 'انتخابات رئاسية لاختيار رئيس جمهورية مصر العربية لعام 2025. يرجى اختيار مرشحك المفضل من بين المرشحين التاليين.',
+      candidates: [
+        {
+          name: 'عبد الله المصري',
+          party: 'حزب الحرية والعدالة',
+          profile_image: 'uploads/356306451_54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg',
+          description: 'سياسي مصري مخضرم، شغل عدة مناصب وزارية، ويعد من أبرز المدافعين عن العدالة الاجتماعية والإصلاح الاقتصادي.'
+        },
+        {
+          name: 'سارة عبد الفتاح',
+          party: 'حزب النور',
+          profile_image: 'uploads/356307049_c84082ec-d429-4ddd-9e6d-b162ba88a5aa.jpg',
+          description: 'أستاذة جامعية وناشطة في مجال حقوق المرأة، تركز حملتها على التعليم والصحة وتمكين الشباب.'
+        },
+        {
+          name: 'محمود علي',
+          party: 'مستقل',
+          profile_image: 'uploads/395229648_93f50dd8-9dec-4f20-ad88-d40acc26dec5.jpg',
+          description: 'رجل أعمال ناجح، يطرح رؤية اقتصادية جديدة لمصر ويعد بمحاربة الفساد ودعم الاستثمار.'
+        }
+      ],
+      start_time: new Date().toISOString(),
+      end_time: new Date(Date.now() + 300000).toISOString(), // 1 day later
+      eligible_governorates: [...Governorates], // Example governorates
+      election_image: 'uploads/21357_pri_boardelections_hero_777797.png' // URL to election image
+    };
 
-    logger.info(`Verified ${elections.length} elections on the blockchain`);
+    await blockchainRepo.createElection(sampleElection);
+
+    const sampleElection2: CreateElectionRequest = {
+      name: 'الانتخابات البرلمانية المصرية 2025',
+      description: 'انتخابات برلمانية لاختيار أعضاء مجلس النواب المصري لعام 2025. يرجى اختيار مرشحك المفضل من بين المرشحين التاليين.',
+      candidates: [
+        {
+          name: 'أحمد سعيد',
+          party: 'حزب الوفد',
+          profile_image: 'uploads/356306451_54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg',
+          description: 'محامي وناشط سياسي، يركز على قضايا حقوق الإنسان والحريات العامة.'
+        },
+        {
+          name: 'منى عبد الرحمن',
+          party: 'حزب التجمع',
+          profile_image: 'uploads/356307049_c84082ec-d429-4ddd-9e6d-b162ba88a5aa.jpg',
+          description: 'خبيرة اقتصادية، تهدف إلى تحسين الظروف الاقتصادية والاجتماعية للمواطنين.'
+        },
+        {
+          name: 'يوسف محمد',
+          party: 'حزب المصريين الأحرار',
+          profile_image: 'uploads/395229648_93f50dd8-9dec-4f20-ad88-d40acc26dec5.jpg',
+          description: 'رجل أعمال، يركز على دعم المشروعات الصغيرة والمتوسطة وتحسين بيئة الأعمال.'
+        },
+        {
+          name: 'ليلى حسن',
+          party: 'حزب التجديد',
+          profile_image: 'uploads/356306451_54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg',
+          description: 'ناشطة اجتماعية، تركز على قضايا المرأة والشباب في المجتمع المصري.'
+        },
+        {
+          name: 'علي عبد الله',
+          party: 'حزب الإصلاح والتنمية',
+          profile_image: 'uploads/395229648_93f50dd8-9dec-4f20-ad88-d40acc26dec5.jpg',
+          description: 'سياسي شاب، يسعى لإحداث تغيير حقيقي في الحياة السياسية والاقتصادية في مصر.'
+        }
+      ],
+      start_time: new Date().toISOString(),
+      end_time: new Date(Date.now() + 500000).toISOString(), // 1 day later
+      eligible_governorates: [...Governorates], // Example governorates
+      election_image: 'uploads/21357_pri_boardelections_hero_777797.png' // URL to election image
+    };
+
+    await blockchainRepo.createElection(sampleElection2);
   }
 
   /**
